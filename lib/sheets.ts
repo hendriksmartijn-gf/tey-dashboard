@@ -104,12 +104,14 @@ function normaliseLinkedIn(rows: string[][]): CampaignRow[] {
   }
 
   // LinkedIn export uses Campaign ID (no name column in this export)
-  const iCampaign  = findCol(headers, 'campaign: campaign id', 'campaign name', 'campaign', 'campaignname', 'name');
-  const iDate      = findCol(headers, 'report: date', 'date', 'day', 'start date', 'startdate');
-  const iImpr      = findCol(headers, 'performance: impressions', 'impressions', 'impressie', 'views');
-  const iClicks    = findCol(headers, 'performance: clicks', 'clicks', 'klikken', 'total clicks');
-  const iSpend     = findCol(headers, 'cost: amount spend in local currency', 'cost: amount spend', 'amount spent', 'spend', 'cost (local currency)');
-  const iConv      = findCol(headers, 'performance: conversions', 'conversions', 'leads', 'total conversions');
+  const iCampaign   = findCol(headers, 'campaign: campaign id', 'campaign name', 'campaign', 'campaignname', 'name');
+  const iDate       = findCol(headers, 'report: date', 'date', 'day', 'start date', 'startdate');
+  const iImpr       = findCol(headers, 'performance: impressions', 'impressions', 'impressie', 'views');
+  const iClicks     = findCol(headers, 'performance: clicks', 'clicks', 'klikken', 'total clicks');
+  const iSpend      = findCol(headers, 'cost: amount spend in local currency', 'cost: amount spend', 'amount spent', 'spend', 'cost (local currency)');
+  const iConv       = findCol(headers, 'performance: conversions', 'conversions', 'leads', 'total conversions');
+  const iReach      = findCol(headers, 'performance: reach', 'reach', 'bereik');
+  const iThruplays  = findCol(headers, 'video: plays at 100%', 'video: plays at 100', 'thruplays', 'thruplay');
 
   return rows.slice(1).flatMap((row): CampaignRow[] => {
     const campaign_name = iCampaign >= 0 ? String(row[iCampaign] ?? '').trim() : 'Unknown';
@@ -118,10 +120,12 @@ function normaliseLinkedIn(rows: string[][]): CampaignRow[] {
     return [{
       platform:      'linkedin' as Platform,
       campaign_name: campaign_name || 'Unknown',
-      impressions:   toNum(iImpr >= 0 ? row[iImpr] : 0),
-      clicks:        toNum(iClicks >= 0 ? row[iClicks] : 0),
-      spend:         toNum(iSpend >= 0 ? row[iSpend] : 0),
-      conversions:   toNum(iConv >= 0 ? row[iConv] : 0),
+      impressions:   toNum(iImpr      >= 0 ? row[iImpr]      : 0),
+      clicks:        toNum(iClicks    >= 0 ? row[iClicks]    : 0),
+      spend:         toNum(iSpend     >= 0 ? row[iSpend]     : 0),
+      conversions:   toNum(iConv      >= 0 ? row[iConv]      : 0),
+      reach:         toNum(iReach     >= 0 ? row[iReach]     : 0),
+      thruplays:     toNum(iThruplays >= 0 ? row[iThruplays] : 0),
       date,
     }];
   });
@@ -135,12 +139,14 @@ function normaliseMeta(rows: string[][]): CampaignRow[] {
     console.log('[sheets] meta_raw headers:', headers);
   }
 
-  const iCampaign  = findCol(headers, 'campaign: campaign name', 'campaign name', 'campaign', 'campaignname', 'name', 'ad set name');
-  const iDate      = findCol(headers, 'report: date', 'date', 'day', 'reporting starts', 'reporting start');
-  const iImpr      = findCol(headers, 'performance: impressions', 'impressions', 'impressie', 'views');
-  const iClicks    = findCol(headers, 'performance: clicks', 'clicks', 'link clicks', 'outbound clicks');
-  const iSpend     = findCol(headers, 'cost: amount spend', 'amount spent (eur)', 'amount spent', 'spend', 'cost');
-  const iConv      = findCol(headers, 'conversions: leads - total', 'conversions', 'results', 'leads', 'purchases');
+  const iCampaign   = findCol(headers, 'campaign: campaign name', 'campaign name', 'campaign', 'campaignname', 'name', 'ad set name');
+  const iDate       = findCol(headers, 'report: date', 'date', 'day', 'reporting starts', 'reporting start');
+  const iImpr       = findCol(headers, 'performance: impressions', 'impressions', 'impressie', 'views');
+  const iClicks     = findCol(headers, 'performance: clicks', 'clicks', 'link clicks', 'outbound clicks');
+  const iSpend      = findCol(headers, 'cost: amount spend', 'amount spent (eur)', 'amount spent', 'spend', 'cost');
+  const iConv       = findCol(headers, 'conversions: leads - total', 'conversions', 'results', 'leads', 'purchases');
+  const iReach      = findCol(headers, 'performance: reach', 'reach', 'bereik');
+  const iThruplays  = findCol(headers, 'video thruplay', 'thruplays', 'thruplay', 'video: plays at 100%');
 
   return rows.slice(1).flatMap((row): CampaignRow[] => {
     const campaign_name = iCampaign >= 0 ? String(row[iCampaign] ?? '').trim() : 'Unknown';
@@ -149,10 +155,12 @@ function normaliseMeta(rows: string[][]): CampaignRow[] {
     return [{
       platform:      'meta' as Platform,
       campaign_name: campaign_name || 'Unknown',
-      impressions:   toNum(iImpr >= 0 ? row[iImpr] : 0),
-      clicks:        toNum(iClicks >= 0 ? row[iClicks] : 0),
-      spend:         toNum(iSpend >= 0 ? row[iSpend] : 0),
-      conversions:   toNum(iConv >= 0 ? row[iConv] : 0),
+      impressions:   toNum(iImpr      >= 0 ? row[iImpr]      : 0),
+      clicks:        toNum(iClicks    >= 0 ? row[iClicks]    : 0),
+      spend:         toNum(iSpend     >= 0 ? row[iSpend]     : 0),
+      conversions:   toNum(iConv      >= 0 ? row[iConv]      : 0),
+      reach:         toNum(iReach     >= 0 ? row[iReach]     : 0),
+      thruplays:     toNum(iThruplays >= 0 ? row[iThruplays] : 0),
       date,
     }];
   });
