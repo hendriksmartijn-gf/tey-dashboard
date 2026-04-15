@@ -1,0 +1,156 @@
+import { google } from 'googleapis';
+import type { CampaignRow, Platform } from '@/types/campaign';
+
+// ── helpers ─────────────────────────────────────────────────────────────────
+
+function toNum(v: unknown): number {
+  if (v === null || v === undefined || v === '') return 0;
+  const n = Number(String(v).replace(/,/g, '.').replace(/[^0-9.\-]/g, ''));
+  return isNaN(n) ? 0 : n;
+}
+
+function normaliseDate(v: unknown): string {
+  if (!v) return '';
+  const s = String(v).trim();
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // DD/MM/YYYY or DD-MM-YYYY
+  const dmy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  // MM/DD/YYYY
+  const mdy = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (mdy) return `${mdy[3]}-${mdy[1].padStart(2, '0')}-${mdy[2].padStart(2, '0')}`;
+  // Try native Date parse as last resort
+  const d = new Date(s);
+  if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  return s;
+}
+
+/** Find a column index by trying several candidate header names (case-insensitive). */
+function findCol(headers: string[], ...candidates: string[]): number {
+  for (const c of candidates) {
+    const idx = headers.findIndex((h) => h.toLowerCase().trim() === c.toLowerCase());
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+// ── Google Sheets client ─────────────────────────────────────────────────────
+
+function getSheetsClient() {
+  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  if (!email || !key) {
+    throw new Error(
+      'Missing GOOGLE_SERVICE_ACCOUNT_EMAIL or GOOGLE_PRIVATE_KEY env vars'
+    );
+  }
+
+  const auth = new google.auth.GoogleAuth({
+    credentials: { client_email: email, private_key: key },
+    scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+  });
+
+  return google.sheets({ version: 'v4', auth });
+}
+
+// ── Raw fetching (with Next.js cache) ────────────────────────────────────────
+
+async function fetchTab(sheetId: string, tabName: string): Promise<string[][]> {
+  const sheets = getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: sheetId,
+    range: tabName,
+  });
+  return (res.data.values ?? []) as string[][];
+}
+
+// ── Normalisation ────────────────────────────────────────────────────────────
+
+function normaliseLinkedIn(rows: string[][]): CampaignRow[] {
+  if (rows.length < 2) return [];
+  const headers = rows[0].map((h) => h.trim());
+
+  // Log headers in dev so we can verify the mapping
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[sheets] linkedin_raw headers:', headers);
+  }
+
+  const iCampaign  = findCol(headers, 'campaign name', 'campaign', 'campaignname', 'name');
+  const iDate      = findCol(headers, 'date', 'day', 'start date', 'startdate');
+  const iImpr      = findCol(headers, 'impressions', 'impressie', 'views');
+  const iClicks    = findCol(headers, 'clicks', 'klikken', 'total clicks', 'totalclicks');
+  const iSpend     = findCol(headers, 'spend', 'cost', 'amount spent', 'amountspent', 'total spent', 'totalspent', 'cost (local currency)');
+  const iConv      = findCol(headers, 'conversions', 'leads', 'total conversions');
+
+  return rows.slice(1).flatMap((row): CampaignRow[] => {
+    const campaign_name = iCampaign >= 0 ? String(row[iCampaign] ?? '').trim() : 'Unknown';
+    const date          = normaliseDate(iDate >= 0 ? row[iDate] : '');
+    if (!campaign_name && !date) return [];
+    return [{
+      platform:      'linkedin' as Platform,
+      campaign_name: campaign_name || 'Unknown',
+      impressions:   toNum(iImpr >= 0 ? row[iImpr] : 0),
+      clicks:        toNum(iClicks >= 0 ? row[iClicks] : 0),
+      spend:         toNum(iSpend >= 0 ? row[iSpend] : 0),
+      conversions:   toNum(iConv >= 0 ? row[iConv] : 0),
+      date,
+    }];
+  });
+}
+
+function normaliseMeta(rows: string[][]): CampaignRow[] {
+  if (rows.length < 2) return [];
+  const headers = rows[0].map((h) => h.trim());
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[sheets] meta_raw headers:', headers);
+  }
+
+  const iCampaign  = findCol(headers, 'campaign name', 'campaign', 'campaignname', 'name', 'ad set name');
+  const iDate      = findCol(headers, 'date', 'day', 'reporting starts', 'reporting start');
+  const iImpr      = findCol(headers, 'impressions', 'impressie', 'views', 'reach');
+  const iClicks    = findCol(headers, 'clicks', 'link clicks', 'outbound clicks', 'total clicks');
+  const iSpend     = findCol(headers, 'amount spent (eur)', 'amount spent', 'spend', 'cost', 'total spend', 'amountspent');
+  const iConv      = findCol(headers, 'conversions', 'results', 'leads', 'purchases', 'total conversions');
+
+  return rows.slice(1).flatMap((row): CampaignRow[] => {
+    const campaign_name = iCampaign >= 0 ? String(row[iCampaign] ?? '').trim() : 'Unknown';
+    const date          = normaliseDate(iDate >= 0 ? row[iDate] : '');
+    if (!campaign_name && !date) return [];
+    return [{
+      platform:      'meta' as Platform,
+      campaign_name: campaign_name || 'Unknown',
+      impressions:   toNum(iImpr >= 0 ? row[iImpr] : 0),
+      clicks:        toNum(iClicks >= 0 ? row[iClicks] : 0),
+      spend:         toNum(iSpend >= 0 ? row[iSpend] : 0),
+      conversions:   toNum(iConv >= 0 ? row[iConv] : 0),
+      date,
+    }];
+  });
+}
+
+// ── Public API ───────────────────────────────────────────────────────────────
+
+export interface RawSheetData {
+  linkedin: string[][];
+  meta: string[][];
+}
+
+export async function getRawSheetData(): Promise<RawSheetData> {
+  const sheetId = process.env.GOOGLE_SHEETS_ID;
+  if (!sheetId) throw new Error('Missing GOOGLE_SHEETS_ID env var');
+
+  const [linkedin, meta] = await Promise.all([
+    fetchTab(sheetId, 'linkedin_raw'),
+    fetchTab(sheetId, 'meta_raw'),
+  ]);
+
+  return { linkedin, meta };
+}
+
+export async function getCampaigns(): Promise<CampaignRow[]> {
+  const { linkedin, meta } = await getRawSheetData();
+  return [...normaliseLinkedIn(linkedin), ...normaliseMeta(meta)];
+}
