@@ -75,24 +75,23 @@ export default function SpendLineChart({ rows }: Props) {
   const [primary,   setPrimary]   = useState<MetricKey>('spend');
   const [secondary, setSecondary] = useState<MetricKey | null>(null);
 
-  // Aggregate by week × platform
-  const byWeek: Record<string, { li: CampaignRow[]; me: CampaignRow[] }> = {};
+  // Aggregate by day × platform
+  const byDay: Record<string, { li: CampaignRow[]; me: CampaignRow[] }> = {};
   for (const r of rows) {
     if (!r.date) continue;
-    const wk = weekKey(r.date);
-    if (!byWeek[wk]) byWeek[wk] = { li: [], me: [] };
-    (r.platform === 'linkedin' ? byWeek[wk].li : byWeek[wk].me).push(r);
+    if (!byDay[r.date]) byDay[r.date] = { li: [], me: [] };
+    (r.platform === 'linkedin' ? byDay[r.date].li : byDay[r.date].me).push(r);
   }
 
-  const data = Object.entries(byWeek)
+  const data = Object.entries(byDay)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([week, { li, me }]) => {
+    .map(([day, { li, me }]) => {
       const liTotals = sumRows(li);
       const meTotals = sumRows(me);
       const point: Record<string, unknown> = {
-        date:              week,
-        li_primary:        getMetricValue(liTotals, primary),
-        me_primary:        getMetricValue(meTotals, primary),
+        date:       day,
+        li_primary: getMetricValue(liTotals, primary),
+        me_primary: getMetricValue(meTotals, primary),
       };
       if (secondary) {
         point.li_secondary = getMetricValue(liTotals, secondary);
@@ -113,7 +112,7 @@ export default function SpendLineChart({ rows }: Props) {
     if (!active || !payload?.length) return null;
     return (
       <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs space-y-1 min-w-[160px]">
-        <p className="font-semibold text-gray-700 mb-2">w/v {String(label).slice(5)}</p>
+        <p className="font-semibold text-gray-700 mb-2">{String(label)}</p>
         {payload.map((p) => {
           const isPrimary = p.dataKey.endsWith('_primary');
           const fmt = isPrimary ? fmtPrimary : (fmtSecondary ?? fmtPrimary);
@@ -149,7 +148,7 @@ export default function SpendLineChart({ rows }: Props) {
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={data} margin={{ top: 4, right: hasSecondary ? 72 : 16, left: 8, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d) => `w/v ${String(d).slice(5)}`} />
+            <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d) => String(d).slice(5)} />
 
             {/* Left axis — primary */}
             <YAxis
