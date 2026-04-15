@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { JWT } from 'google-auth-library';
 import type { CampaignRow, Platform } from '@/types/campaign';
 
 // ── helpers ─────────────────────────────────────────────────────────────────
@@ -39,7 +40,9 @@ function findCol(headers: string[], ...candidates: string[]): number {
 
 function getSheetsClient() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const key = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  // Support both literal \n (from .env) and real newlines (from Docker/Vercel secrets)
+  const key = (process.env.GOOGLE_PRIVATE_KEY ?? '')
+    .replace(/\\n/g, '\n');
 
   if (!email || !key) {
     throw new Error(
@@ -47,8 +50,10 @@ function getSheetsClient() {
     );
   }
 
-  const auth = new google.auth.GoogleAuth({
-    credentials: { client_email: email, private_key: key },
+  // Use JWT directly — more robust with Node 18+ / OpenSSL 3 than GoogleAuth
+  const auth = new JWT({
+    email,
+    key,
     scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
   });
 
