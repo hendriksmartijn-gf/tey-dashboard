@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from 'react';
 import KpiCard, { KpiCardSkeleton } from '@/components/KpiCard';
 import SpendLineChart, { SpendLineChartSkeleton } from '@/components/SpendLineChart';
 import ImpressionsBarChart, { ImpressionsBarChartSkeleton } from '@/components/ImpressionsBarChart';
-import CampaignTable, { CampaignTableSkeleton } from '@/components/CampaignTable';
 import CampaignSelector from '@/components/CampaignSelector';
 import type { CampaignRow } from '@/types/campaign';
 import { getMetricValue, sumRows } from '@/types/campaign';
@@ -21,6 +20,8 @@ export default function DashboardPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
+  const [lineOpen, setLineOpen] = useState(true);
+  const [barOpen,  setBarOpen]  = useState(true);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -123,21 +124,38 @@ export default function DashboardPage() {
             </section>
 
             {/* Charts */}
-            <section>
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Grafieken</h2>
-              <div className="grid grid-cols-1 gap-4">
-                {loading ? (
-                  <><SpendLineChartSkeleton /><ImpressionsBarChartSkeleton /></>
-                ) : (
-                  <><SpendLineChart rows={filtered} /><ImpressionsBarChart rows={filtered} /></>
+            <section className="space-y-4">
+              {/* Line chart */}
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <button
+                  onClick={() => setLineOpen((o) => !o)}
+                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Lijndiagram</span>
+                  <span className="text-gray-400 text-sm">{lineOpen ? '▲' : '▼'}</span>
+                </button>
+                {lineOpen && (
+                  <div className="px-5 pb-5">
+                    {loading ? <SpendLineChartSkeleton /> : <SpendLineChart rows={filtered} />}
+                  </div>
                 )}
               </div>
-            </section>
 
-            {/* Table */}
-            <section>
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Alle campagnes</h2>
-              {loading ? <CampaignTableSkeleton /> : <CampaignTable rows={filtered} />}
+              {/* Bar chart */}
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                <button
+                  onClick={() => setBarOpen((o) => !o)}
+                  className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Staafdiagram</span>
+                  <span className="text-gray-400 text-sm">{barOpen ? '▲' : '▼'}</span>
+                </button>
+                {barOpen && (
+                  <div className="px-5 pb-5">
+                    {loading ? <ImpressionsBarChartSkeleton /> : <ImpressionsBarChart rows={filtered} />}
+                  </div>
+                )}
+              </div>
             </section>
 
             <LinkedInSection />
