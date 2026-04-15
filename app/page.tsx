@@ -86,7 +86,7 @@ export default function DashboardPage() {
 
         <div className="flex gap-6">
           {/* ── Left sidebar: campaign selector ── */}
-          <aside className="w-56 shrink-0 space-y-4">
+          <aside className="w-80 shrink-0 space-y-4">
             {loading ? (
               <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 animate-pulse space-y-2">
                 {Array.from({ length: 6 }).map((_, i) => (
@@ -104,7 +104,7 @@ export default function DashboardPage() {
             {/* KPI cards */}
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Overzicht</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {loading ? (
                   Array.from({ length: 6 }).map((_, i) => <KpiCardSkeleton key={i} />)
                 ) : (
@@ -123,7 +123,7 @@ export default function DashboardPage() {
             {/* Charts */}
             <section>
               <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Grafieken</h2>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 {loading ? (
                   <><SpendLineChartSkeleton /><ImpressionsBarChartSkeleton /></>
                 ) : (

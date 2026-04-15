@@ -84,7 +84,7 @@ export default function CampaignSelector({ rows, selected, onChange }: Props) {
               className="w-3.5 h-3.5 shrink-0"
               style={{ accentColor: color }}
             />
-            <span className="text-xs text-gray-700 truncate" title={c.name}>{c.name}</span>
+            <span className="text-xs text-gray-700 leading-snug">{c.name}</span>
           </label>
         ))}
       </div>
@@ -105,7 +105,7 @@ export default function CampaignSelector({ rows, selected, onChange }: Props) {
         </div>
       </div>
       {/* Lists */}
-      <div className="p-1 max-h-72 overflow-y-auto space-y-1">
+      <div className="p-1 max-h-[70vh] overflow-y-auto space-y-1">
         {linkedin.length > 0 && <Group platform="linkedin" list={linkedin} color={LINKEDIN_COLOR} />}
         {meta.length    > 0 && <Group platform="meta"     list={meta}     color={META_COLOR} />}
       </div>
