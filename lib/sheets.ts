@@ -64,11 +64,32 @@ function getSheetsClient() {
 
 async function fetchTab(sheetId: string, tabName: string): Promise<string[][]> {
   const sheets = getSheetsClient();
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: tabName,
-  });
-  return (res.data.values ?? []) as string[][];
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: tabName,
+    });
+    return (res.data.values ?? []) as string[][];
+  } catch (err: unknown) {
+    const status = (err as { status?: number; code?: number }).status
+      ?? (err as { status?: number; code?: number }).code;
+    const message = (err as { message?: string }).message ?? String(err);
+
+    if (status === 404 || message.includes('not found')) {
+      throw new Error(
+        `Sheet tab "${tabName}" not found in spreadsheet "${sheetId}". ` +
+        `Check that the tab exists with exactly that name (case-sensitive) ` +
+        `and that the service account has been granted Viewer access to the spreadsheet.`
+      );
+    }
+    if (status === 403) {
+      throw new Error(
+        `Permission denied accessing spreadsheet "${sheetId}". ` +
+        `Share the spreadsheet with your service account email as Viewer.`
+      );
+    }
+    throw err;
+  }
 }
 
 // ── Normalisation ────────────────────────────────────────────────────────────
