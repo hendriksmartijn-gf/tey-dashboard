@@ -26,19 +26,29 @@ export default function SpendLineChart({ rows }: Props) {
   const [metric, setMetric] = useState<MetricKey>('spend');
   const { format } = METRICS[metric];
 
-  // Aggregate by date × platform
-  const byDate: Record<string, { li: CampaignRow[]; me: CampaignRow[] }> = {};
-  for (const r of rows) {
-    if (!r.date) continue;
-    if (!byDate[r.date]) byDate[r.date] = { li: [], me: [] };
-    if (r.platform === 'linkedin') byDate[r.date].li.push(r);
-    else                           byDate[r.date].me.push(r);
+  // Get Monday of the ISO week for a YYYY-MM-DD string
+  function weekKey(dateStr: string): string {
+    const d = new Date(dateStr);
+    const day = d.getUTCDay(); // 0=Sun, 1=Mon…
+    const diff = (day === 0 ? -6 : 1 - day); // shift to Monday
+    d.setUTCDate(d.getUTCDate() + diff);
+    return d.toISOString().slice(0, 10); // YYYY-MM-DD of Monday
   }
 
-  const data = Object.entries(byDate)
+  // Aggregate by week × platform
+  const byWeek: Record<string, { li: CampaignRow[]; me: CampaignRow[] }> = {};
+  for (const r of rows) {
+    if (!r.date) continue;
+    const wk = weekKey(r.date);
+    if (!byWeek[wk]) byWeek[wk] = { li: [], me: [] };
+    if (r.platform === 'linkedin') byWeek[wk].li.push(r);
+    else                           byWeek[wk].me.push(r);
+  }
+
+  const data = Object.entries(byWeek)
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([date, { li, me }]) => ({
-      date,
+    .map(([week, { li, me }]) => ({
+      date: week,
       linkedin: getMetricValue(sumRows(li), metric),
       meta:     getMetricValue(sumRows(me), metric),
     }));
@@ -68,7 +78,7 @@ export default function SpendLineChart({ rows }: Props) {
         <ResponsiveContainer width="100%" height={260}>
           <LineChart data={data} margin={{ top: 4, right: 16, left: 8, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d) => d.slice(5)} />
+            <XAxis dataKey="date" tick={{ fontSize: 11 }} tickFormatter={(d) => `w/v ${d.slice(5)}`} />
             <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => format(v)} width={72} />
             <Tooltip
               formatter={(v) => format(Number(v ?? 0))}
