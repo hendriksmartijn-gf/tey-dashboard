@@ -103,12 +103,13 @@ function normaliseLinkedIn(rows: string[][]): CampaignRow[] {
     console.log('[sheets] linkedin_raw headers:', headers);
   }
 
-  const iCampaign  = findCol(headers, 'campaign name', 'campaign', 'campaignname', 'name');
-  const iDate      = findCol(headers, 'date', 'day', 'start date', 'startdate');
-  const iImpr      = findCol(headers, 'impressions', 'impressie', 'views');
-  const iClicks    = findCol(headers, 'clicks', 'klikken', 'total clicks', 'totalclicks');
-  const iSpend     = findCol(headers, 'spend', 'cost', 'amount spent', 'amountspent', 'total spent', 'totalspent', 'cost (local currency)');
-  const iConv      = findCol(headers, 'conversions', 'leads', 'total conversions');
+  // LinkedIn export uses Campaign ID (no name column in this export)
+  const iCampaign  = findCol(headers, 'campaign: campaign id', 'campaign name', 'campaign', 'campaignname', 'name');
+  const iDate      = findCol(headers, 'report: date', 'date', 'day', 'start date', 'startdate');
+  const iImpr      = findCol(headers, 'performance: impressions', 'impressions', 'impressie', 'views');
+  const iClicks    = findCol(headers, 'performance: clicks', 'clicks', 'klikken', 'total clicks');
+  const iSpend     = findCol(headers, 'cost: amount spend in local currency', 'cost: amount spend', 'amount spent', 'spend', 'cost (local currency)');
+  const iConv      = findCol(headers, 'performance: conversions', 'conversions', 'leads', 'total conversions');
 
   return rows.slice(1).flatMap((row): CampaignRow[] => {
     const campaign_name = iCampaign >= 0 ? String(row[iCampaign] ?? '').trim() : 'Unknown';
@@ -134,12 +135,12 @@ function normaliseMeta(rows: string[][]): CampaignRow[] {
     console.log('[sheets] meta_raw headers:', headers);
   }
 
-  const iCampaign  = findCol(headers, 'campaign name', 'campaign', 'campaignname', 'name', 'ad set name');
-  const iDate      = findCol(headers, 'date', 'day', 'reporting starts', 'reporting start');
-  const iImpr      = findCol(headers, 'impressions', 'impressie', 'views', 'reach');
-  const iClicks    = findCol(headers, 'clicks', 'link clicks', 'outbound clicks', 'total clicks');
-  const iSpend     = findCol(headers, 'amount spent (eur)', 'amount spent', 'spend', 'cost', 'total spend', 'amountspent');
-  const iConv      = findCol(headers, 'conversions', 'results', 'leads', 'purchases', 'total conversions');
+  const iCampaign  = findCol(headers, 'campaign: campaign name', 'campaign name', 'campaign', 'campaignname', 'name', 'ad set name');
+  const iDate      = findCol(headers, 'report: date', 'date', 'day', 'reporting starts', 'reporting start');
+  const iImpr      = findCol(headers, 'performance: impressions', 'impressions', 'impressie', 'views');
+  const iClicks    = findCol(headers, 'performance: clicks', 'clicks', 'link clicks', 'outbound clicks');
+  const iSpend     = findCol(headers, 'cost: amount spend', 'amount spent (eur)', 'amount spent', 'spend', 'cost');
+  const iConv      = findCol(headers, 'conversions: leads - total', 'conversions', 'results', 'leads', 'purchases');
 
   return rows.slice(1).flatMap((row): CampaignRow[] => {
     const campaign_name = iCampaign >= 0 ? String(row[iCampaign] ?? '').trim() : 'Unknown';
