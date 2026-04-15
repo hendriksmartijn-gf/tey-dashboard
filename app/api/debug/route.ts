@@ -6,10 +6,6 @@ import { getRawSheetData } from '@/lib/sheets';
 // Development-only — returns raw headers, sample rows, and lists all tab names
 // in the spreadsheet so you can verify the exact tab names.
 export async function GET() {
-  if (process.env.NODE_ENV === 'production') {
-    return NextResponse.json({ error: 'Not available in production' }, { status: 403 });
-  }
-
   const sheetId = process.env.GOOGLE_SHEETS_ID ?? '(not set)';
 
   // First: list all actual tab names in the spreadsheet
