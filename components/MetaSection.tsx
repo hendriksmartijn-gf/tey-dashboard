@@ -114,7 +114,12 @@ function aggregateByAd(rows: MetaDetailRow[]): AdRow[] {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function MetaSection() {
+interface Props {
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export default function MetaSection({ dateFrom, dateTo }: Props) {
   const [rows,    setRows]    = useState<MetaDetailRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
@@ -133,9 +138,14 @@ export default function MetaSection() {
       .finally(() => setLoading(false));
   }, []);
 
-  const daily     = aggregateDaily(rows);
-  const byAudience = aggregateByAudience(rows);
-  const byAd       = aggregateByAd(rows);
+  const filtered   = rows.filter((r) =>
+    (!dateFrom || r.date >= dateFrom) &&
+    (!dateTo   || r.date <= dateTo)
+  );
+
+  const daily      = aggregateDaily(filtered);
+  const byAudience = aggregateByAudience(filtered);
+  const byAd       = aggregateByAd(filtered);
 
   return (
     <section>

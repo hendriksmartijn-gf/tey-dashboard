@@ -72,8 +72,10 @@ function MetricPicker({
 }
 
 export default function SpendLineChart({ rows }: Props) {
-  const [primary,   setPrimary]   = useState<MetricKey>('spend');
-  const [secondary, setSecondary] = useState<MetricKey | null>(null);
+  const [primary,       setPrimary]       = useState<MetricKey>('spend');
+  const [secondary,     setSecondary]     = useState<MetricKey | null>(null);
+  const [showLinkedIn,  setShowLinkedIn]  = useState(true);
+  const [showMeta,      setShowMeta]      = useState(true);
 
   // Aggregate by day × platform
   const byDay: Record<string, { li: CampaignRow[]; me: CampaignRow[] }> = {};
@@ -136,8 +138,30 @@ export default function SpendLineChart({ rows }: Props) {
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
       {/* Pickers */}
       <div className="space-y-2 mb-5">
-        <MetricPicker label="Primair" color="#374151" value={primary} onChange={(k) => k && setPrimary(k)} />
+        <MetricPicker label="Primair"   color="#374151" value={primary}   onChange={(k) => k && setPrimary(k)} />
         <MetricPicker label="Secundair" color="#9ca3af" value={secondary} onChange={setSecondary} includeNone />
+        {/* Platform toggles */}
+        <div className="flex items-center gap-2 pt-1">
+          <span className="text-xs font-semibold uppercase tracking-widest text-gray-300 mr-1">Platform</span>
+          <button
+            onClick={() => setShowLinkedIn((v) => !v)}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+              showLinkedIn ? 'text-white' : 'bg-gray-100 text-gray-400'
+            }`}
+            style={showLinkedIn ? { background: LINKEDIN_COLOR } : {}}
+          >
+            LinkedIn
+          </button>
+          <button
+            onClick={() => setShowMeta((v) => !v)}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-colors ${
+              showMeta ? 'text-white' : 'bg-gray-100 text-gray-400'
+            }`}
+            style={showMeta ? { background: META_COLOR } : {}}
+          >
+            Meta
+          </button>
+        </div>
       </div>
 
       {data.length === 0 ? (
@@ -174,23 +198,27 @@ export default function SpendLineChart({ rows }: Props) {
             <Legend />
 
             {/* Primary lines — solid */}
-            <Line yAxisId="primary" type="monotone" dataKey="li_primary" name={`LinkedIn — ${METRICS[primary].label}`}
-              stroke={LINKEDIN_COLOR} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-            <Line yAxisId="primary" type="monotone" dataKey="me_primary" name={`Meta — ${METRICS[primary].label}`}
-              stroke={META_COLOR} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+            {showLinkedIn && (
+              <Line yAxisId="primary" type="monotone" dataKey="li_primary" name={`LinkedIn — ${METRICS[primary].label}`}
+                stroke={LINKEDIN_COLOR} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+            )}
+            {showMeta && (
+              <Line yAxisId="primary" type="monotone" dataKey="me_primary" name={`Meta — ${METRICS[primary].label}`}
+                stroke={META_COLOR} strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+            )}
 
             {/* Secondary lines — dashed */}
-            {hasSecondary && secondary && (
-              <>
-                <Line yAxisId="secondary" type="monotone" dataKey="li_secondary"
-                  name={`LinkedIn — ${METRICS[secondary].label}`}
-                  stroke={LINKEDIN_COLOR} strokeWidth={1.5} strokeDasharray="5 3"
-                  dot={false} activeDot={{ r: 3 }} />
-                <Line yAxisId="secondary" type="monotone" dataKey="me_secondary"
-                  name={`Meta — ${METRICS[secondary].label}`}
-                  stroke={META_COLOR} strokeWidth={1.5} strokeDasharray="5 3"
-                  dot={false} activeDot={{ r: 3 }} />
-              </>
+            {hasSecondary && secondary && showLinkedIn && (
+              <Line yAxisId="secondary" type="monotone" dataKey="li_secondary"
+                name={`LinkedIn — ${METRICS[secondary].label}`}
+                stroke={LINKEDIN_COLOR} strokeWidth={1.5} strokeDasharray="5 3"
+                dot={false} activeDot={{ r: 3 }} />
+            )}
+            {hasSecondary && secondary && showMeta && (
+              <Line yAxisId="secondary" type="monotone" dataKey="me_secondary"
+                name={`Meta — ${METRICS[secondary].label}`}
+                stroke={META_COLOR} strokeWidth={1.5} strokeDasharray="5 3"
+                dot={false} activeDot={{ r: 3 }} />
             )}
           </LineChart>
         </ResponsiveContainer>

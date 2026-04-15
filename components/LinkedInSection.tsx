@@ -70,7 +70,12 @@ function aggregateByCampaign(rows: LinkedInDetailRow[]): CampaignRow[] {
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export default function LinkedInSection() {
+interface Props {
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export default function LinkedInSection({ dateFrom, dateTo }: Props) {
   const [rows,    setRows]    = useState<LinkedInDetailRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
@@ -89,8 +94,13 @@ export default function LinkedInSection() {
       .finally(() => setLoading(false));
   }, []);
 
-  const daily    = aggregateDaily(rows);
-  const byCamp   = aggregateByCampaign(rows);
+  const filtered = rows.filter((r) =>
+    (!dateFrom || r.date >= dateFrom) &&
+    (!dateTo   || r.date <= dateTo)
+  );
+
+  const daily    = aggregateDaily(filtered);
+  const byCamp   = aggregateByCampaign(filtered);
 
   return (
     <section>

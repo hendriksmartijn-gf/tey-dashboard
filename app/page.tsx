@@ -22,6 +22,8 @@ export default function DashboardPage() {
   const [error,    setError]    = useState<string | null>(null);
   const [lineOpen, setLineOpen] = useState(true);
   const [barOpen,  setBarOpen]  = useState(true);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo,   setDateTo]   = useState('');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -45,7 +47,11 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const filtered = rows.filter((r) => selected.has(r.campaign_name));
+  const filtered = rows.filter((r) =>
+    selected.has(r.campaign_name) &&
+    (!dateFrom || r.date >= dateFrom) &&
+    (!dateTo   || r.date <= dateTo)
+  );
   const totals   = sumRows(filtered);
   const ctr      = getMetricValue(totals, 'ctr');
   const cpc      = getMetricValue(totals, 'cpc');
@@ -70,6 +76,36 @@ export default function DashboardPage() {
           </button>
         </div>
       </header>
+
+      {/* Date filter bar */}
+      <div className="bg-white border-b border-gray-100 sticky top-14 z-10">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-12 flex items-center gap-4">
+          <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Periode</span>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            />
+            <span className="text-xs text-gray-400">t/m</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
+            />
+          </div>
+          {(dateFrom || dateTo) && (
+            <button
+              onClick={() => { setDateFrom(''); setDateTo(''); }}
+              className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+            >
+              Wis filter
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
@@ -158,8 +194,8 @@ export default function DashboardPage() {
               </div>
             </section>
 
-            <LinkedInSection />
-            <MetaSection />
+            <LinkedInSection dateFrom={dateFrom} dateTo={dateTo} />
+            <MetaSection    dateFrom={dateFrom} dateTo={dateTo} />
 
           </div>
         </div>
