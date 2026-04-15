@@ -8,6 +8,8 @@ import CampaignTable, { CampaignTableSkeleton } from '@/components/CampaignTable
 import CampaignSelector from '@/components/CampaignSelector';
 import type { CampaignRow } from '@/types/campaign';
 import { getMetricValue, sumRows } from '@/types/campaign';
+import LinkedInSection from '@/components/LinkedInSection';
+import MetaSection from '@/components/MetaSection';
 
 const fmtNum = (n: number) => n.toLocaleString('nl-NL');
 const fmtEur = (n: number) =>
@@ -137,6 +139,9 @@ export default function DashboardPage() {
               <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Alle campagnes</h2>
               {loading ? <CampaignTableSkeleton /> : <CampaignTable rows={filtered} />}
             </section>
+
+            <LinkedInSection />
+            <MetaSection />
 
           </div>
         </div>
