@@ -5,6 +5,7 @@ import KpiCard, { KpiCardSkeleton } from '@/components/KpiCard';
 import ChannelCard, { ChannelCardSkeleton } from '@/components/ChannelCard';
 import CampaignRankTable, { CampaignRankTableSkeleton } from '@/components/CampaignRankTable';
 import CpaTrendChart, { CpaTrendChartSkeleton } from '@/components/CpaTrendChart';
+import AnalyticsSection from '@/components/AnalyticsSection';
 import type { CampaignRow } from '@/types/campaign';
 import { sumRows } from '@/types/campaign';
 
@@ -214,6 +215,12 @@ export default function DashboardPage() {
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Campagnes</h2>
           {loading ? <CampaignRankTableSkeleton /> : <CampaignRankTable rows={filtered} />}
+        </section>
+
+        {/* ── Google Analytics ── */}
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Website — Google Analytics</h2>
+          <AnalyticsSection dateFrom={dateFrom} dateTo={dateTo} />
         </section>
 
       </div>
