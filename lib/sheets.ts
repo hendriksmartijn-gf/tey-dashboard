@@ -104,7 +104,7 @@ function normaliseLinkedIn(rows: string[][]): CampaignRow[] {
   }
 
   // LinkedIn export uses Campaign ID (no name column in this export)
-  const iCampaign   = findCol(headers, 'campaign: campaign id', 'campaign name', 'campaign', 'campaignname', 'name');
+  const iCampaign   = findCol(headers, 'campaign: campaign name', 'campaign name', 'campaignname', 'name', 'campaign: campaign id', 'campaign');
   const iDate       = findCol(headers, 'report: date', 'date', 'day', 'start date', 'startdate');
   const iImpr       = findCol(headers, 'performance: impressions', 'impressions', 'impressie', 'views');
   const iClicks     = findCol(headers, 'performance: clicks', 'clicks', 'klikken', 'total clicks');
