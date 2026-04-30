@@ -6,6 +6,7 @@ import ChannelCard, { ChannelCardSkeleton } from '@/components/ChannelCard';
 import CampaignRankTable, { CampaignRankTableSkeleton } from '@/components/CampaignRankTable';
 import CpaTrendChart, { CpaTrendChartSkeleton } from '@/components/CpaTrendChart';
 import AnalyticsSection from '@/components/AnalyticsSection';
+import CampaignSelector from '@/components/CampaignSelector';
 import type { CampaignRow, Platform } from '@/types/campaign';
 import { sumRows } from '@/types/campaign';
 
@@ -97,6 +98,9 @@ export default function DashboardPage() {
   const [customFrom,  setCustomFrom]  = useState('');
   const [customTo,    setCustomTo]    = useState('');
 
+  // Campaign selector
+  const [selectedCampaigns, setSelectedCampaigns] = useState<Set<string>>(new Set());
+
   const { from: dateFrom, to: dateTo } = useMemo(
     () => presetRange(preset, customFrom, customTo),
     [preset, customFrom, customTo],
@@ -126,6 +130,11 @@ export default function DashboardPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  // Initialise (or re-initialise after refresh) the campaign selection to all campaigns
+  useEffect(() => {
+    setSelectedCampaigns(new Set(rows.map((r) => r.campaign_name)));
+  }, [rows]);
+
   // Filtered rows by date
   const filtered = useMemo(() =>
     rows.filter((r) =>
@@ -135,14 +144,22 @@ export default function DashboardPage() {
     [rows, dateFrom, dateTo],
   );
 
+  // Filtered rows by date AND selected campaigns
+  const filteredRows = useMemo(() =>
+    selectedCampaigns.size === 0
+      ? filtered
+      : filtered.filter((r) => selectedCampaigns.has(r.campaign_name)),
+    [filtered, selectedCampaigns],
+  );
+
   // Totals
-  const totals     = useMemo(() => sumRows(filtered), [filtered]);
+  const totals     = useMemo(() => sumRows(filteredRows), [filteredRows]);
   const overallCpa = totals.conversions > 0 ? totals.spend / totals.conversions : null;
 
   // Per-channel totals
-  const liTotals = useMemo(() => sumRows(filtered.filter((r) => r.platform === 'linkedin')), [filtered]);
-  const meTotals = useMemo(() => sumRows(filtered.filter((r) => r.platform === 'meta')),     [filtered]);
-  const goTotals = useMemo(() => sumRows(filtered.filter((r) => r.platform === 'google')),   [filtered]);
+  const liTotals = useMemo(() => sumRows(filteredRows.filter((r) => r.platform === 'linkedin')), [filteredRows]);
+  const meTotals = useMemo(() => sumRows(filteredRows.filter((r) => r.platform === 'meta')),     [filteredRows]);
+  const goTotals = useMemo(() => sumRows(filteredRows.filter((r) => r.platform === 'google')),   [filteredRows]);
   const liCpa = liTotals.conversions > 0 ? liTotals.spend / liTotals.conversions : null;
   const meCpa = meTotals.conversions > 0 ? meTotals.spend / meTotals.conversions : null;
   const goCpa = goTotals.conversions > 0 ? goTotals.spend / goTotals.conversions : null;
@@ -152,6 +169,10 @@ export default function DashboardPage() {
   const liCpc = liTotals.clicks > 0 ? liTotals.spend / liTotals.clicks : 0;
   const meCpc = meTotals.clicks > 0 ? meTotals.spend / meTotals.clicks : 0;
   const goCpc = goTotals.clicks > 0 ? goTotals.spend / goTotals.clicks : 0;
+  const liCpv = (liTotals.thruplays ?? 0) > 0 ? liTotals.spend / (liTotals.thruplays ?? 0) : null;
+  const meCpv = (meTotals.thruplays ?? 0) > 0 ? meTotals.spend / (meTotals.thruplays ?? 0) : null;
+  const goCpv = (goTotals.thruplays ?? 0) > 0 ? goTotals.spend / (goTotals.thruplays ?? 0) : null;
+  const hasVideoData = (liTotals.thruplays ?? 0) + (meTotals.thruplays ?? 0) + (goTotals.thruplays ?? 0) > 0;
 
   const cpas       = [liCpa, meCpa, goCpa];
   const minCpa     = Math.min(...cpas.filter((c): c is number => c !== null));
@@ -163,7 +184,7 @@ export default function DashboardPage() {
   // Campaign summaries (spotlight)
   const campaignSummaries = useMemo(() => {
     const map = new Map<string, { platform: Platform; spend: number; applicants: number; clicks: number; impressions: number }>();
-    for (const r of filtered) {
+    for (const r of filteredRows) {
       const key = `${r.platform}::${r.campaign_name}`;
       const cur = map.get(key) ?? { platform: r.platform, spend: 0, applicants: 0, clicks: 0, impressions: 0 };
       cur.spend       += r.spend;
@@ -336,133 +357,151 @@ export default function DashboardPage() {
         {/* TAB: ADVERTENTIES                                          */}
         {/* ══════════════════════════════════════════════════════════ */}
         {tab === 'ads' && (
-          <>
-            {/* Top KPIs */}
-            <section>
-              <h2 className="gf-eyebrow mb-5">Totaaloverzicht</h2>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {loading ? (
-                  Array.from({ length: 4 }).map((_, i) => <KpiCardSkeleton key={i} />)
-                ) : (
-                  <>
-                    <KpiCard title="Budget gespendeerd"     value={fmtEur(totals.spend)}                          subtitle="Alle kanalen" />
-                    <KpiCard title="Totaal sollicitanten"   value={fmtNum(totals.conversions)}                    subtitle="LinkedIn · Meta · Google Ads" />
-                    <KpiCard title="Kosten per sollicitant" value={overallCpa !== null ? fmtEur(overallCpa) : '—'} subtitle="Spend ÷ sollicitanten" />
-                    <KpiCard
-                      title="Beste kanaal"
-                      value={bestChannel}
-                      accent={bestChannel !== '—'}
-                      subtitle={
-                        bestChannel !== '—' && isFinite(minCpa)
-                          ? `Laagste CPA: ${fmtEur(minCpa)}`
-                          : 'Geen conversiedata'
-                      }
-                    />
-                  </>
-                )}
-              </div>
-            </section>
+          <div className="flex gap-6 items-start">
 
-            {/* Channel comparison */}
-            <section>
-              <h2 className="gf-eyebrow mb-5">Kanaalvergelijking</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {loading ? (
-                  <><ChannelCardSkeleton /><ChannelCardSkeleton /><ChannelCardSkeleton /></>
-                ) : (
-                  <>
-                    <ChannelCard platform="linkedin" spend={liTotals.spend} applicants={liTotals.conversions} clicks={liTotals.clicks} impressions={liTotals.impressions} isWinner={liWins} />
-                    <ChannelCard platform="meta"     spend={meTotals.spend} applicants={meTotals.conversions} clicks={meTotals.clicks} impressions={meTotals.impressions} isWinner={meWins} />
-                    <ChannelCard platform="google"   spend={goTotals.spend} applicants={goTotals.conversions} clicks={goTotals.clicks} impressions={goTotals.impressions} isWinner={goWins} />
-                  </>
-                )}
-              </div>
+            {/* ── Sidebar: campaign selector ─────────────────────── */}
+            <div className="w-60 flex-shrink-0 sticky" style={{ top: '9.5rem' }}>
+              {loading
+                ? <div className="bg-white animate-pulse rounded-lg" style={{ border: '1px solid #DCE0E6', height: '320px' }} />
+                : <CampaignSelector rows={filtered} selected={selectedCampaigns} onChange={setSelectedCampaigns} />
+              }
+            </div>
 
-              {!loading && (
-                <div className="bg-white overflow-hidden" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
-                  <table className="w-full">
-                    <thead style={{ background: '#F0F4F8', borderBottom: '1px solid #DCE0E6' }}>
-                      <tr>
-                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider w-36" style={{ color: '#8C9BAF' }}>Metric</th>
-                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#0077B5' }}>LinkedIn</th>
-                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#1877F2' }}>Meta</th>
-                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#F59E0B' }}>Google Ads</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        { label: 'Budget',        li: fmtEur(liTotals.spend),        me: fmtEur(meTotals.spend),        go: fmtEur(goTotals.spend),        liR: liTotals.spend,        meR: meTotals.spend,        goR: goTotals.spend,        neutral: true },
-                        { label: 'Impressies',    li: fmtNum(liTotals.impressions),  me: fmtNum(meTotals.impressions),  go: fmtNum(goTotals.impressions),  liR: liTotals.impressions,  meR: meTotals.impressions,  goR: goTotals.impressions },
-                        { label: 'Clicks',        li: fmtNum(liTotals.clicks),       me: fmtNum(meTotals.clicks),       go: fmtNum(goTotals.clicks),       liR: liTotals.clicks,       meR: meTotals.clicks,       goR: goTotals.clicks },
-                        { label: 'CTR',           li: fmtPct(liCtr),                 me: fmtPct(meCtr),                 go: fmtPct(goCtr),                 liR: liCtr,                 meR: meCtr,                 goR: goCtr },
-                        { label: 'Kosten/klik',   li: liCpc > 0 ? fmtEur(liCpc) : '—', me: meCpc > 0 ? fmtEur(meCpc) : '—', go: goCpc > 0 ? fmtEur(goCpc) : '—', liR: liCpc, meR: meCpc, goR: goCpc, lower: true },
-                        { label: 'Sollicitanten', li: fmtNum(liTotals.conversions),  me: fmtNum(meTotals.conversions),  go: fmtNum(goTotals.conversions),  liR: liTotals.conversions,  meR: meTotals.conversions,  goR: goTotals.conversions },
-                        { label: 'Kosten/soll.',  li: liCpa != null ? fmtEur(liCpa) : '—', me: meCpa != null ? fmtEur(meCpa) : '—', go: goCpa != null ? fmtEur(goCpa) : '—', liR: liCpa ?? 0, meR: meCpa ?? 0, goR: goCpa ?? 0, lower: true },
-                      ].map(({ label, li, me, go, liR, meR, goR, lower, neutral }) => {
-                        const best = lower
-                          ? Math.min(...[liR, meR, goR].filter(Boolean))
-                          : Math.max(liR, meR, goR);
-                        const win = (v: number) => !neutral && v === best && v > 0;
-                        return (
-                          <tr key={label} style={{ borderBottom: '1px solid #F0F4F8' }} className="last:border-0">
-                            <td className="py-3 px-4 text-xs font-medium" style={{ color: '#555E6C' }}>{label}</td>
-                            {([li, me, go] as string[]).map((val, i) => {
-                              const raw = [liR, meR, goR][i] as number;
-                              return (
-                                <td key={i} className="py-3 px-4 text-sm tabular-nums font-semibold" style={{ color: win(raw) ? '#16A34A' : '#12101F' }}>
-                                  {win(raw) && <span className="mr-1" style={{ color: '#16A34A' }}>✓</span>}
-                                  {val}
-                                </td>
-                              );
-                            })}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </section>
+            {/* ── Main content ───────────────────────────────────── */}
+            <div className="flex-1 min-w-0 space-y-10">
 
-            {/* CPA trend */}
-            <section>
-              <h2 className="gf-eyebrow mb-5">CPA trend</h2>
-              {loading ? <CpaTrendChartSkeleton /> : <CpaTrendChart rows={filtered} />}
-            </section>
-
-            {/* Uitschieters */}
-            <section>
-              <h2 className="gf-eyebrow mb-5">Uitschieters</h2>
-              {loading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <KpiCardSkeleton /><KpiCardSkeleton />
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {bestCpaCampaign ? (
-                    <SpotlightCard badge="🏆" badgeColor="#16A34A" title="Beste CPA" campaignName={bestCpaCampaign.campaign_name} platform={bestCpaCampaign.platform} metric={fmtEur(bestCpaCampaign.cpa)} metricLabel="CPA" />
+              {/* Top KPIs */}
+              <section>
+                <h2 className="gf-eyebrow mb-5">Totaaloverzicht</h2>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {loading ? (
+                    Array.from({ length: 4 }).map((_, i) => <KpiCardSkeleton key={i} />)
                   ) : (
-                    <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>
-                      Geen conversiedata beschikbaar
-                    </div>
-                  )}
-                  {bestCpcCampaign ? (
-                    <SpotlightCard badge="🖱️" badgeColor="#16A34A" title="Laagste CPC" campaignName={bestCpcCampaign.campaign_name} platform={bestCpcCampaign.platform} metric={fmtEur(bestCpcCampaign.cpc)} metricLabel="CPC" />
-                  ) : (
-                    <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>
-                      Geen klikdata beschikbaar
-                    </div>
+                    <>
+                      <KpiCard title="Budget gespendeerd"     value={fmtEur(totals.spend)}                          subtitle="Alle kanalen" />
+                      <KpiCard title="Totaal sollicitanten"   value={fmtNum(totals.conversions)}                    subtitle="LinkedIn · Meta · Google Ads" />
+                      <KpiCard title="Kosten per sollicitant" value={overallCpa !== null ? fmtEur(overallCpa) : '—'} subtitle="Spend ÷ sollicitanten" />
+                      <KpiCard
+                        title="Beste kanaal"
+                        value={bestChannel}
+                        accent={bestChannel !== '—'}
+                        subtitle={
+                          bestChannel !== '—' && isFinite(minCpa)
+                            ? `Laagste CPA: ${fmtEur(minCpa)}`
+                            : 'Geen conversiedata'
+                        }
+                      />
+                    </>
                   )}
                 </div>
-              )}
-            </section>
+              </section>
 
-            {/* Campaign ranking */}
-            <section>
-              <h2 className="gf-eyebrow mb-5">Campagnes</h2>
-              {loading ? <CampaignRankTableSkeleton /> : <CampaignRankTable rows={filtered} />}
-            </section>
-          </>
+              {/* Channel comparison */}
+              <section>
+                <h2 className="gf-eyebrow mb-5">Kanaalvergelijking</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                  {loading ? (
+                    <><ChannelCardSkeleton /><ChannelCardSkeleton /><ChannelCardSkeleton /></>
+                  ) : (
+                    <>
+                      <ChannelCard platform="linkedin" spend={liTotals.spend} applicants={liTotals.conversions} clicks={liTotals.clicks} impressions={liTotals.impressions} thruplays={liTotals.thruplays ?? 0} isWinner={liWins} />
+                      <ChannelCard platform="meta"     spend={meTotals.spend} applicants={meTotals.conversions} clicks={meTotals.clicks} impressions={meTotals.impressions} thruplays={meTotals.thruplays ?? 0} isWinner={meWins} />
+                      <ChannelCard platform="google"   spend={goTotals.spend} applicants={goTotals.conversions} clicks={goTotals.clicks} impressions={goTotals.impressions} thruplays={goTotals.thruplays ?? 0} isWinner={goWins} />
+                    </>
+                  )}
+                </div>
+
+                {!loading && (
+                  <div className="bg-white overflow-hidden" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
+                    <table className="w-full">
+                      <thead style={{ background: '#F0F4F8', borderBottom: '1px solid #DCE0E6' }}>
+                        <tr>
+                          <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider w-36" style={{ color: '#8C9BAF' }}>Metric</th>
+                          <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#0077B5' }}>LinkedIn</th>
+                          <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#1877F2' }}>Meta</th>
+                          <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#F59E0B' }}>Google Ads</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {[
+                          { label: 'Budget',        li: fmtEur(liTotals.spend),        me: fmtEur(meTotals.spend),        go: fmtEur(goTotals.spend),        liR: liTotals.spend,        meR: meTotals.spend,        goR: goTotals.spend,        neutral: true },
+                          { label: 'Impressies',    li: fmtNum(liTotals.impressions),  me: fmtNum(meTotals.impressions),  go: fmtNum(goTotals.impressions),  liR: liTotals.impressions,  meR: meTotals.impressions,  goR: goTotals.impressions },
+                          { label: 'Clicks',        li: fmtNum(liTotals.clicks),       me: fmtNum(meTotals.clicks),       go: fmtNum(goTotals.clicks),       liR: liTotals.clicks,       meR: meTotals.clicks,       goR: goTotals.clicks },
+                          { label: 'CTR',           li: fmtPct(liCtr),                 me: fmtPct(meCtr),                 go: fmtPct(goCtr),                 liR: liCtr,                 meR: meCtr,                 goR: goCtr },
+                          { label: 'Kosten/klik',   li: liCpc > 0 ? fmtEur(liCpc) : '—', me: meCpc > 0 ? fmtEur(meCpc) : '—', go: goCpc > 0 ? fmtEur(goCpc) : '—', liR: liCpc, meR: meCpc, goR: goCpc, lower: true },
+                          { label: 'Sollicitanten', li: fmtNum(liTotals.conversions),  me: fmtNum(meTotals.conversions),  go: fmtNum(goTotals.conversions),  liR: liTotals.conversions,  meR: meTotals.conversions,  goR: goTotals.conversions },
+                          { label: 'Kosten/soll.',  li: liCpa != null ? fmtEur(liCpa) : '—', me: meCpa != null ? fmtEur(meCpa) : '—', go: goCpa != null ? fmtEur(goCpa) : '—', liR: liCpa ?? 0, meR: meCpa ?? 0, goR: goCpa ?? 0, lower: true },
+                          ...(hasVideoData ? [
+                            { label: 'Video views',    li: (liTotals.thruplays ?? 0) > 0 ? fmtNum(liTotals.thruplays ?? 0) : '—', me: (meTotals.thruplays ?? 0) > 0 ? fmtNum(meTotals.thruplays ?? 0) : '—', go: (goTotals.thruplays ?? 0) > 0 ? fmtNum(goTotals.thruplays ?? 0) : '—', liR: liTotals.thruplays ?? 0, meR: meTotals.thruplays ?? 0, goR: goTotals.thruplays ?? 0 },
+                            { label: 'Kosten/video',   li: liCpv != null ? fmtEur(liCpv) : '—', me: meCpv != null ? fmtEur(meCpv) : '—', go: goCpv != null ? fmtEur(goCpv) : '—', liR: liCpv ?? 0, meR: meCpv ?? 0, goR: goCpv ?? 0, lower: true },
+                          ] : []),
+                        ].map(({ label, li, me, go, liR, meR, goR, lower, neutral }) => {
+                          const best = lower
+                            ? Math.min(...[liR, meR, goR].filter(Boolean))
+                            : Math.max(liR, meR, goR);
+                          const win = (v: number) => !neutral && v === best && v > 0;
+                          return (
+                            <tr key={label} style={{ borderBottom: '1px solid #F0F4F8' }} className="last:border-0">
+                              <td className="py-3 px-4 text-xs font-medium" style={{ color: '#555E6C' }}>{label}</td>
+                              {([li, me, go] as string[]).map((val, i) => {
+                                const raw = [liR, meR, goR][i] as number;
+                                return (
+                                  <td key={i} className="py-3 px-4 text-sm tabular-nums font-semibold" style={{ color: win(raw) ? '#16A34A' : '#12101F' }}>
+                                    {win(raw) && <span className="mr-1" style={{ color: '#16A34A' }}>✓</span>}
+                                    {val}
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </section>
+
+              {/* CPA trend */}
+              <section>
+                <h2 className="gf-eyebrow mb-5">CPA trend</h2>
+                {loading ? <CpaTrendChartSkeleton /> : <CpaTrendChart rows={filteredRows} />}
+              </section>
+
+              {/* Uitschieters */}
+              <section>
+                <h2 className="gf-eyebrow mb-5">Uitschieters</h2>
+                {loading ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <KpiCardSkeleton /><KpiCardSkeleton />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {bestCpaCampaign ? (
+                      <SpotlightCard badge="🏆" badgeColor="#16A34A" title="Beste CPA" campaignName={bestCpaCampaign.campaign_name} platform={bestCpaCampaign.platform} metric={fmtEur(bestCpaCampaign.cpa)} metricLabel="CPA" />
+                    ) : (
+                      <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>
+                        Geen conversiedata beschikbaar
+                      </div>
+                    )}
+                    {bestCpcCampaign ? (
+                      <SpotlightCard badge="🖱️" badgeColor="#16A34A" title="Laagste CPC" campaignName={bestCpcCampaign.campaign_name} platform={bestCpcCampaign.platform} metric={fmtEur(bestCpcCampaign.cpc)} metricLabel="CPC" />
+                    ) : (
+                      <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>
+                        Geen klikdata beschikbaar
+                      </div>
+                    )}
+                  </div>
+                )}
+              </section>
+
+              {/* Campaign ranking */}
+              <section>
+                <h2 className="gf-eyebrow mb-5">Campagnes</h2>
+                {loading ? <CampaignRankTableSkeleton /> : <CampaignRankTable rows={filteredRows} />}
+              </section>
+
+            </div>{/* end main */}
+          </div>
         )}
 
         {/* ══════════════════════════════════════════════════════════ */}

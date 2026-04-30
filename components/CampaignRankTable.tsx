@@ -9,8 +9,10 @@ interface CampaignSummary {
   spend: number;
   applicants: number;
   clicks: number;
+  thruplays: number;
   cpa: number;
   cpc: number;
+  cpv: number;
   budgetShare: number; // 0-1
 }
 
@@ -56,14 +58,15 @@ export function CampaignRankTableSkeleton() {
 
 export default function CampaignRankTable({ rows }: Props) {
   // Aggregate by platform + campaign name
-  const map = new Map<string, { platform: Platform; spend: number; applicants: number; clicks: number; impressions: number }>();
+  const map = new Map<string, { platform: Platform; spend: number; applicants: number; clicks: number; impressions: number; thruplays: number }>();
   for (const r of rows) {
     const key = `${r.platform}::${r.campaign_name}`;
-    const cur = map.get(key) ?? { platform: r.platform, spend: 0, applicants: 0, clicks: 0, impressions: 0 };
+    const cur = map.get(key) ?? { platform: r.platform, spend: 0, applicants: 0, clicks: 0, impressions: 0, thruplays: 0 };
     cur.spend       += r.spend;
     cur.applicants  += r.conversions;
     cur.clicks      += r.clicks;
     cur.impressions += r.impressions;
+    cur.thruplays   += r.thruplays ?? 0;
     map.set(key, cur);
   }
 
@@ -77,8 +80,10 @@ export default function CampaignRankTable({ rows }: Props) {
       spend:       v.spend,
       applicants:  v.applicants,
       clicks:      v.clicks,
+      thruplays:   v.thruplays,
       cpa:         v.applicants > 0 ? v.spend / v.applicants : Infinity,
       cpc:         v.clicks     > 0 ? v.spend / v.clicks     : Infinity,
+      cpv:         v.thruplays  > 0 ? v.spend / v.thruplays  : Infinity,
       budgetShare: totalSpend > 0 ? v.spend / totalSpend : 0,
     }))
     .sort((a, b) => a.cpa - b.cpa)
@@ -110,6 +115,8 @@ export default function CampaignRankTable({ rows }: Props) {
               <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Kosten/klik</th>
               <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Sollicitanten</th>
               <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Kosten/soll.</th>
+              <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Video views</th>
+              <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Kosten/video</th>
               <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider w-36" style={{ color: '#8C9BAF' }}>Budgetaandeel</th>
             </tr>
           </thead>
@@ -171,6 +178,16 @@ export default function CampaignRankTable({ rows }: Props) {
                   {/* CPA */}
                   <td className="px-5 py-3.5 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: isTop ? '#16A34A' : '#12101F' }}>
                     {c.cpa !== Infinity ? fmtEur(c.cpa) : '—'}
+                  </td>
+
+                  {/* Video views */}
+                  <td className="px-5 py-3.5 text-right tabular-nums" style={{ color: '#555E6C' }}>
+                    {c.thruplays > 0 ? fmtNum(c.thruplays) : '—'}
+                  </td>
+
+                  {/* CPV */}
+                  <td className="px-5 py-3.5 text-right tabular-nums whitespace-nowrap" style={{ color: '#555E6C' }}>
+                    {c.cpv !== Infinity ? fmtEur(c.cpv) : '—'}
                   </td>
 
                   {/* Budget share bar */}
