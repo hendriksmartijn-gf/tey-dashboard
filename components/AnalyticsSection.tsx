@@ -5,8 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts';
-import type { AnalyticsDayRow, ConversionBySource, ConversionByCampaign, ConversionByJob, ApplicationStart, GoogleAdsCampaignRow, GoogleAdsDayRow } from '@/lib/analytics';
-import GoogleAdsSection, { GoogleAdsSectionSkeleton } from '@/components/GoogleAdsSection';
+import type { AnalyticsDayRow, ConversionBySource, ConversionByCampaign } from '@/lib/analytics';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -14,18 +13,12 @@ const fmtNum = (n: number) => n.toLocaleString('nl-NL');
 const fmtEur = (n: number) =>
   n.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
 
-// Strip the site-name prefix GA4 appends to every page title
-const TITLE_PREFIX = 'Forensisch centrum Teylingereind - ';
-function shortTitle(raw: string): string {
-  return raw.startsWith(TITLE_PREFIX) ? raw.slice(TITLE_PREFIX.length) : raw;
-}
-
 function sourceToChannel(source: string): 'linkedin' | 'meta' | 'google' | 'other' {
   const s = source.toLowerCase();
-  if (s.includes('linkedin') || s.includes('lnkd'))                                    return 'linkedin';
+  if (s.includes('linkedin') || s.includes('lnkd'))                                   return 'linkedin';
   if (s.includes('facebook') || s.includes('instagram') || s.includes('fb') ||
-      s.includes('meta')     || s === 'ig')                                             return 'meta';
-  if (s.includes('google')   || s.includes('goog'))                                    return 'google';
+      s.includes('meta')     || s === 'ig')                                            return 'meta';
+  if (s.includes('google')   || s.includes('goog'))                                   return 'google';
   return 'other';
 }
 
@@ -66,9 +59,9 @@ function SectionSkeleton() {
 // ── Real CPA card ─────────────────────────────────────────────────────────────
 
 function RealCpaCard({
-  platform, label, color, completions, spend,
+  label, color, completions, spend,
 }: {
-  platform: string; label: string; color: string; completions: number; spend: number;
+  label: string; color: string; completions: number; spend: number;
 }) {
   const cpa = completions > 0 && spend > 0 ? spend / completions : null;
   return (
@@ -102,7 +95,7 @@ function RealCpaCard({
 interface Props {
   dateFrom?: string;
   dateTo?:   string;
-  liSpend?:  number;  // from ad sheet — passed in from parent
+  liSpend?:  number;
   meSpend?:  number;
 }
 
@@ -110,12 +103,6 @@ interface AnalyticsData {
   byDay:                 AnalyticsDayRow[];
   conversionsBySource:   ConversionBySource[];
   conversionsByCampaign: ConversionByCampaign[];
-  conversionsByJob:      ConversionByJob[];
-  applicationStarts:     ApplicationStart[];
-  googleAds: {
-    campaigns: GoogleAdsCampaignRow[];
-    byDay:     GoogleAdsDayRow[];
-  };
 }
 
 export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpend = 0 }: Props) {
@@ -126,7 +113,6 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
   useEffect(() => {
     setLoading(true);
     setError(null);
-
     const params = new URLSearchParams();
     if (dateFrom) params.set('startDate', dateFrom);
     if (dateTo)   params.set('endDate',   dateTo);
@@ -144,13 +130,13 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
       .finally(() => setLoading(false));
   }, [dateFrom, dateTo]);
 
-  // ── Aggregations ────────────────────────────────────────────────────────────
+  // ── Aggregations ─────────────────────────────────────────────────────────────
 
   const totals = useMemo(() => {
     if (!data) return { sessions: 0, users: 0, keyEvents: 0 };
     return data.byDay.reduce(
       (acc, r) => ({ sessions: acc.sessions + r.sessions, users: acc.users + r.users, keyEvents: acc.keyEvents + r.keyEvents }),
-      { sessions: 0, users: 0, keyEvents: 0 }
+      { sessions: 0, users: 0, keyEvents: 0 },
     );
   }, [data]);
 
@@ -168,8 +154,6 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
       .map(([date, v]) => ({ date: date.slice(5), ...v }));
   }, [data]);
 
-  // Aggregate Recruitee completions by platform — derived from conversionsByCampaign
-  // so these totals always match the campaign table below (single source of truth).
   const completionsByPlatform = useMemo(() => {
     if (!data) return { linkedin: 0, meta: 0, google: 0, other: 0 };
     return data.conversionsByCampaign.reduce(
@@ -177,65 +161,16 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
         const ch = sourceToChannel(r.source);
         return { ...acc, [ch]: acc[ch as keyof typeof acc] + r.completions };
       },
-      { linkedin: 0, meta: 0, google: 0, other: 0 }
+      { linkedin: 0, meta: 0, google: 0, other: 0 },
     );
   }, [data]);
 
-  // Completions by campaign (for the table)
   const campaignRows = useMemo(() => {
     if (!data) return [];
-    return data.conversionsByCampaign.slice(0, 15); // top 15
+    return data.conversionsByCampaign.slice(0, 15);
   }, [data]);
 
-  // Completions by job title — pivoted by platform, joined with starts
-  const jobRows = useMemo(() => {
-    if (!data) return [];
-
-    // Aggregate completions per job × platform
-    const compMap = new Map<string, { linkedin: number; meta: number; google: number; other: number }>();
-    for (const r of data.conversionsByJob) {
-      const ch  = sourceToChannel(r.source);
-      const cur = compMap.get(r.jobTitle) ?? { linkedin: 0, meta: 0, google: 0, other: 0 };
-      cur[ch] += r.completions;
-      compMap.set(r.jobTitle, cur);
-    }
-
-    // Aggregate starts per job title (across all sources)
-    const startsMap = new Map<string, number>();
-    for (const r of data.applicationStarts) {
-      startsMap.set(r.jobTitle, (startsMap.get(r.jobTitle) ?? 0) + r.starts);
-    }
-
-    // Union of all known job titles (some may only have starts, not yet completions)
-    const allTitles = new Set([...compMap.keys(), ...startsMap.keys()]);
-
-    return Array.from(allTitles)
-      .map((jobTitle) => {
-        const v      = compMap.get(jobTitle) ?? { linkedin: 0, meta: 0, google: 0, other: 0 };
-        const starts = startsMap.get(jobTitle) ?? 0;
-        const completed = v.linkedin + v.meta + v.google + v.other;
-        return {
-          jobTitle,
-          linkedin:  v.linkedin,
-          meta:      v.meta,
-          google:    v.google,
-          other:     v.other,
-          starts,
-          completed,
-          convRate:  starts > 0 ? completed / starts : null,
-        };
-      })
-      .sort((a, b) => b.completed - a.completed || b.starts - a.starts);
-  }, [data]);
-
-  // Overall funnel totals
-  const funnelTotals = useMemo(() => {
-    const starts    = jobRows.reduce((s, r) => s + r.starts, 0);
-    const completed = jobRows.reduce((s, r) => s + r.completed, 0);
-    return { starts, completed, rate: starts > 0 ? completed / starts : null };
-  }, [jobRows]);
-
-  // ── Render ──────────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────────
 
   if (loading) return <SectionSkeleton />;
 
@@ -259,24 +194,12 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
       {/* ── Real CPA section ── */}
       <div>
         <p className="text-xs text-[#8C9BAF] mb-3">
-          Sollicitaties geteld via <strong className="text-[#555E6C]">Sollicitatie_voltooid_recruitee</strong> in GA4, gekoppeld aan kanaal via UTM-source.
-          Spend komt uit de advertentieplatformen (Ads-tab).
+          Sollicitaties geteld via <strong className="text-[#555E6C]">Sollicitatie_voltooid_recruitee</strong> in GA4,
+          gekoppeld aan kanaal via UTM-source. Spend uit de Advertenties-tab.
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <RealCpaCard
-            platform="linkedin"
-            label="LinkedIn"
-            color="#0077B5"
-            completions={completionsByPlatform.linkedin}
-            spend={liSpend}
-          />
-          <RealCpaCard
-            platform="meta"
-            label="Meta / Facebook"
-            color="#1877F2"
-            completions={completionsByPlatform.meta}
-            spend={meSpend}
-          />
+          <RealCpaCard label="LinkedIn"        color="#0077B5" completions={completionsByPlatform.linkedin} spend={liSpend} />
+          <RealCpaCard label="Meta / Facebook" color="#1877F2" completions={completionsByPlatform.meta}     spend={meSpend} />
         </div>
       </div>
 
@@ -289,9 +212,7 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Voltooide sollicitaties</p>
-          <p className="text-2xl font-bold text-gray-900 tabular-nums">
-            {fmtNum(totalCompletions)}
-          </p>
+          <p className="text-2xl font-bold text-gray-900 tabular-nums">{fmtNum(totalCompletions)}</p>
           <p className="text-xs text-gray-400 mt-1">Via Recruitee (GA4)</p>
         </div>
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -300,68 +221,6 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
           <p className="text-xs text-gray-400 mt-1">Sessies → sollicitatie</p>
         </div>
       </div>
-
-      {/* ── Application funnel ── */}
-      {funnelTotals.starts > 0 && (
-        <div className="bg-white overflow-hidden" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
-          <div className="px-5 py-4" style={{ borderBottom: '1px solid #DCE0E6' }}>
-            <span className="gf-eyebrow">Sollicitatiefunnel</span>
-          </div>
-          <div className="px-5 py-5">
-            {/* Step bar */}
-            <div className="flex items-stretch gap-0 mb-5">
-              {/* Started */}
-              <div className="flex-1 rounded-l-lg px-5 py-4" style={{ background: '#F0F4F8' }}>
-                <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#8C9BAF' }}>Formulier gestart</p>
-                <p className="text-3xl font-bold tabular-nums" style={{ color: '#12101F' }}>{fmtNum(funnelTotals.starts)}</p>
-                <p className="text-xs mt-1" style={{ color: '#BCC4CF' }}>application_form_start</p>
-              </div>
-
-              {/* Arrow */}
-              <div className="flex items-center px-3" style={{ color: '#BCC4CF' }}>
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M4 10h12M12 6l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-
-              {/* Completed */}
-              <div className="flex-1 px-5 py-4" style={{ background: '#F0F4F8' }}>
-                <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#8C9BAF' }}>Sollicitatie voltooid</p>
-                <p className="text-3xl font-bold tabular-nums" style={{ color: '#12101F' }}>{fmtNum(funnelTotals.completed)}</p>
-                <p className="text-xs mt-1" style={{ color: '#BCC4CF' }}>Sollicitatie_voltooid_recruitee</p>
-              </div>
-
-              {/* Arrow */}
-              <div className="flex items-center px-3" style={{ color: '#BCC4CF' }}>
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M4 10h12M12 6l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </div>
-
-              {/* Conversion rate */}
-              <div className="flex-1 rounded-r-lg px-5 py-4" style={{ background: funnelTotals.rate !== null && funnelTotals.rate >= 0.5 ? 'rgba(22,163,74,0.06)' : '#F0F4F8', border: funnelTotals.rate !== null && funnelTotals.rate >= 0.5 ? '1px solid rgba(22,163,74,0.2)' : undefined }}>
-                <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#8C9BAF' }}>Afrondingsratio</p>
-                <p className="text-3xl font-bold tabular-nums" style={{ color: funnelTotals.rate !== null && funnelTotals.rate >= 0.5 ? '#16A34A' : '#12101F' }}>
-                  {funnelTotals.rate !== null ? `${(funnelTotals.rate * 100).toFixed(1)}%` : '—'}
-                </p>
-                <p className="text-xs mt-1" style={{ color: '#BCC4CF' }}>Gestart → voltooid</p>
-              </div>
-            </div>
-
-            {/* Drop-off note */}
-            {funnelTotals.rate !== null && (
-              <div className="flex items-center gap-2 text-xs" style={{ color: '#8C9BAF' }}>
-                <span style={{ color: '#BCC4CF' }}>↳</span>
-                <span>
-                  <span className="font-semibold" style={{ color: '#555E6C' }}>{fmtNum(funnelTotals.starts - funnelTotals.completed)}</span>
-                  {' '}mensen startten maar voltooiden de sollicitatie niet
-                  {' '}(<span className="font-semibold" style={{ color: '#555E6C' }}>{((1 - funnelTotals.rate) * 100).toFixed(1)}%</span> uitval)
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* ── Sessions trend ── */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -375,14 +234,14 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
               <XAxis dataKey="date" tick={{ fontSize: 10 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} width={48} />
               <Tooltip formatter={(v: unknown) => [fmtNum(Number(v)), '']} labelFormatter={(l) => String(l)} />
-              <Line type="monotone" dataKey="sessions"  name="Sessies"  stroke="#6366f1" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+              <Line type="monotone" dataKey="sessions"  name="Sessies"    stroke="#6366f1" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
               <Line type="monotone" dataKey="keyEvents" name="Key events" stroke="#10b981" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
             </LineChart>
           </ResponsiveContainer>
         )}
       </div>
 
-      {/* ── Completions by campaign ── */}
+      {/* ── Completions by UTM campaign ── */}
       {campaignRows.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">
@@ -405,7 +264,6 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
                   ch === 'linkedin' ? '#0077B5' :
                   ch === 'meta'     ? '#1877F2' :
                   ch === 'google'   ? '#F59E0B' : '#9ca3af';
-                const darkText = ch === 'google';
                 const isUnset = r.campaign === '(not set)';
                 return (
                   <tr key={i} className="hover:bg-gray-50 transition-colors">
@@ -414,7 +272,7 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
                       {isUnset ? '— geen UTM-campagne —' : r.campaign}
                     </td>
                     <td className="px-5 py-3">
-                      <span className="text-xs font-bold px-2 py-0.5" style={{ background: color, borderRadius: '4px', color: darkText ? '#12101F' : '#ffffff' }}>
+                      <span className="text-xs font-bold px-2 py-0.5" style={{ background: color, borderRadius: '4px', color: ch === 'google' ? '#12101F' : '#ffffff' }}>
                         {r.source}
                       </span>
                     </td>
@@ -429,81 +287,18 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
         </div>
       )}
 
-      {/* ── Sollicitaties per vacature ── */}
-      {jobRows.length > 0 && (
-        <div className="bg-white overflow-hidden" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
-          <div className="px-5 py-4" style={{ borderBottom: '1px solid #DCE0E6' }}>
-            <span className="gf-eyebrow">Sollicitaties per vacature</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead style={{ background: '#F0F4F8' }}>
-                <tr>
-                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#8C9BAF' }}>Vacature (paginatitel)</th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#0077B5' }}>LinkedIn</th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#1877F2' }}>Meta</th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#F59E0B' }}>Google</th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Overig</th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Gestart</th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#12101F' }}>Voltooid</th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Ratio</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jobRows.map((r, i) => {
-                  const rateColor = r.convRate === null ? '#BCC4CF'
-                    : r.convRate >= 0.7 ? '#16A34A'
-                    : r.convRate >= 0.4 ? '#F59E0B'
-                    : '#E02D3C';
-                  return (
-                    <tr key={i} style={{ borderBottom: '1px solid #F0F4F8' }} className="last:border-0 hover:bg-[#F0F4F8]/60 transition-colors">
-                      <td className="px-5 py-3 font-medium" title={r.jobTitle} style={{ color: '#12101F', maxWidth: '380px' }}>
-                        {shortTitle(r.jobTitle)}
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.linkedin > 0 ? '#0077B5' : '#BCC4CF', fontWeight: r.linkedin > 0 ? 600 : 400 }}>
-                        {r.linkedin > 0 ? fmtNum(r.linkedin) : '—'}
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.meta > 0 ? '#1877F2' : '#BCC4CF', fontWeight: r.meta > 0 ? 600 : 400 }}>
-                        {r.meta > 0 ? fmtNum(r.meta) : '—'}
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.google > 0 ? '#F59E0B' : '#BCC4CF', fontWeight: r.google > 0 ? 600 : 400 }}>
-                        {r.google > 0 ? fmtNum(r.google) : '—'}
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.other > 0 ? '#555E6C' : '#BCC4CF', fontWeight: r.other > 0 ? 600 : 400 }}>
-                        {r.other > 0 ? fmtNum(r.other) : '—'}
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.starts > 0 ? '#555E6C' : '#BCC4CF' }}>
-                        {r.starts > 0 ? fmtNum(r.starts) : '—'}
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums font-bold" style={{ color: '#12101F' }}>
-                        {fmtNum(r.completed)}
-                      </td>
-                      <td className="px-5 py-3 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: rateColor }}>
-                        {r.convRate !== null ? `${(r.convRate * 100).toFixed(0)}%` : '—'}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* ── Channel breakdown by session grouping ── */}
+      {/* ── Channel breakdown ── */}
       {data && data.byDay.length > 0 && (() => {
         const map = new Map<string, number>();
-        for (const r of data.byDay) {
-          map.set(r.channel, (map.get(r.channel) ?? 0) + r.sessions);
-        }
-        const rows = Array.from(map.entries()).sort(([, a], [, b]) => b - a);
+        for (const r of data.byDay) map.set(r.channel, (map.get(r.channel) ?? 0) + r.sessions);
+        const rows  = Array.from(map.entries()).sort(([, a], [, b]) => b - a);
         const total = rows.reduce((s, [, v]) => s + v, 0);
         return (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Sessies per kanaal</p>
             <div className="space-y-2.5">
               {rows.map(([ch, count]) => {
-                const pct = total > 0 ? (count / total) * 100 : 0;
+                const pct   = total > 0 ? (count / total) * 100 : 0;
                 const color = CHANNEL_CONFIG[ch]?.color ?? '#9ca3af';
                 return (
                   <div key={ch} className="flex items-center gap-3">
@@ -520,19 +315,6 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
           </div>
         );
       })()}
-
-      {/* ── Google Ads ── */}
-      <div>
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Google Ads</h3>
-        {loading ? (
-          <GoogleAdsSectionSkeleton />
-        ) : (
-          <GoogleAdsSection
-            campaigns={data?.googleAds.campaigns ?? []}
-            byDay={data?.googleAds.byDay ?? []}
-          />
-        )}
-      </div>
 
     </div>
   );

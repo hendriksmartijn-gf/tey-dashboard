@@ -6,6 +6,8 @@ import ChannelCard, { ChannelCardSkeleton } from '@/components/ChannelCard';
 import CampaignRankTable, { CampaignRankTableSkeleton } from '@/components/CampaignRankTable';
 import CpaTrendChart, { CpaTrendChartSkeleton } from '@/components/CpaTrendChart';
 import AnalyticsSection from '@/components/AnalyticsSection';
+import SollicitatiesSection from '@/components/SollicitatiesSection';
+import GoogleAdsWrapper from '@/components/GoogleAdsWrapper';
 import CampaignSelector from '@/components/CampaignSelector';
 import type { CampaignRow, Platform } from '@/types/campaign';
 import { sumRows } from '@/types/campaign';
@@ -18,7 +20,7 @@ const fmtPct = (n: number) => `${(n * 100).toFixed(2)}%`;
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 type Preset = 'week' | 'month' | '3months' | 'custom';
-type Tab    = 'ads' | 'ga4';
+type Tab    = 'ads' | 'ga4' | 'sollicitaties';
 
 function fmt(d: Date) { return d.toISOString().split('T')[0]; }
 
@@ -255,8 +257,9 @@ export default function DashboardPage() {
           {/* Row 1: tabs — pill segment control */}
           <div className="flex items-center gap-2 pt-3 pb-3">
             {([
-              { key: 'ads' as Tab,  label: 'Advertenties' },
-              { key: 'ga4' as Tab,  label: 'GA4 — Website' },
+              { key: 'ads' as Tab,            label: 'Advertenties' },
+              { key: 'sollicitaties' as Tab,  label: 'Sollicitaties' },
+              { key: 'ga4' as Tab,            label: 'GA4 — Website' },
             ] as { key: Tab; label: string }[]).map(({ key, label }) => {
               const active = tab === key;
               return (
@@ -500,8 +503,21 @@ export default function DashboardPage() {
                 {loading ? <CampaignRankTableSkeleton /> : <CampaignRankTable rows={filteredRows} />}
               </section>
 
+              {/* Google Ads (GA4-attributed) */}
+              <section>
+                <h2 className="gf-eyebrow mb-5">Google Ads — GA4</h2>
+                <GoogleAdsWrapper dateFrom={dateFrom} dateTo={dateTo} />
+              </section>
+
             </div>{/* end main */}
           </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* TAB: SOLLICITATIES                                         */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {tab === 'sollicitaties' && (
+          <SollicitatiesSection dateFrom={dateFrom} dateTo={dateTo} />
         )}
 
         {/* ══════════════════════════════════════════════════════════ */}
