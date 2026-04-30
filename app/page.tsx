@@ -17,50 +17,13 @@ const fmtPct = (n: number) => `${(n * 100).toFixed(2)}%`;
 const PLATFORM_COLOR: Record<Platform, string> = {
   linkedin: '#0077B5',
   meta:     '#1877F2',
+  google:   '#4285F4',
 };
 const PLATFORM_LABEL: Record<Platform, string> = {
   linkedin: 'LinkedIn',
   meta:     'Meta',
+  google:   'Google Ads',
 };
-
-// ── Channel comparison table ─────────────────────────────────────────────────
-
-interface CompareRowProps {
-  label: string;
-  liValue: string;
-  meValue: string;
-  liRaw: number;
-  meRaw: number;
-  lowerIsBetter?: boolean;
-  neutral?: boolean;
-}
-
-function CompareRow({ label, liValue, meValue, liRaw, meRaw, lowerIsBetter = false, neutral = false }: CompareRowProps) {
-  const liWins = !neutral && (lowerIsBetter ? liRaw < meRaw : liRaw > meRaw) && liRaw !== meRaw;
-  const meWins = !neutral && (lowerIsBetter ? meRaw < liRaw : meRaw > liRaw) && liRaw !== meRaw;
-  const diffPct = liRaw > 0 ? ((meRaw - liRaw) / liRaw) * 100 : null;
-
-  return (
-    <tr className="border-b border-gray-50 last:border-0">
-      <td className="py-3 px-4 text-xs text-gray-500 font-medium w-40">{label}</td>
-      <td className={`py-3 px-4 text-sm tabular-nums font-semibold ${liWins ? 'text-green-700' : 'text-gray-800'}`}>
-        {liWins && <span className="mr-1 text-green-500">✓</span>}
-        {liValue}
-      </td>
-      <td className={`py-3 px-4 text-sm tabular-nums font-semibold ${meWins ? 'text-green-700' : 'text-gray-800'}`}>
-        {meWins && <span className="mr-1 text-green-500">✓</span>}
-        {meValue}
-      </td>
-      <td className="py-3 px-4 text-xs text-gray-400 text-right tabular-nums">
-        {!neutral && diffPct !== null && liRaw !== meRaw && (
-          <span className={diffPct > 0 === !lowerIsBetter ? 'text-green-600' : 'text-red-400'}>
-            Meta {diffPct > 0 ? '+' : ''}{diffPct.toFixed(0)}%
-          </span>
-        )}
-      </td>
-    </tr>
-  );
-}
 
 // ── Campaign spotlight card ──────────────────────────────────────────────────
 
@@ -112,12 +75,17 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/campaigns');
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}));
-        throw new Error((json as { error?: string }).error ?? `HTTP ${res.status}`);
+      const [campaignsRes, googleRes] = await Promise.all([
+        fetch('/api/campaigns'),
+        fetch('/api/google-ads'),
+      ]);
+      if (!campaignsRes.ok) {
+        const json = await campaignsRes.json().catch(() => ({}));
+        throw new Error((json as { error?: string }).error ?? `HTTP ${campaignsRes.status}`);
       }
-      setRows(await res.json() as CampaignRow[]);
+      const campaigns: CampaignRow[] = await campaignsRes.json();
+      const google: CampaignRow[]    = googleRes.ok ? await googleRes.json() : [];
+      setRows([...campaigns, ...google]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
@@ -143,20 +111,24 @@ export default function DashboardPage() {
   // Per-channel totals
   const liTotals = useMemo(() => sumRows(filtered.filter((r) => r.platform === 'linkedin')), [filtered]);
   const meTotals = useMemo(() => sumRows(filtered.filter((r) => r.platform === 'meta')),     [filtered]);
+  const goTotals = useMemo(() => sumRows(filtered.filter((r) => r.platform === 'google')),   [filtered]);
   const liCpa    = liTotals.conversions > 0 ? liTotals.spend / liTotals.conversions : null;
   const meCpa    = meTotals.conversions > 0 ? meTotals.spend / meTotals.conversions : null;
+  const goCpa    = goTotals.conversions > 0 ? goTotals.spend / goTotals.conversions : null;
   const liCtr    = liTotals.impressions > 0 ? liTotals.clicks / liTotals.impressions : 0;
   const meCtr    = meTotals.impressions > 0 ? meTotals.clicks / meTotals.impressions : 0;
+  const goCtr    = goTotals.impressions > 0 ? goTotals.clicks / goTotals.impressions : 0;
   const liCpc    = liTotals.clicks > 0 ? liTotals.spend / liTotals.clicks : 0;
   const meCpc    = meTotals.clicks > 0 ? meTotals.spend / meTotals.clicks : 0;
-  const liWins   = liCpa !== null && meCpa !== null && liCpa <= meCpa;
-  const meWins   = liCpa !== null && meCpa !== null && meCpa < liCpa;
+  const goCpc    = goTotals.clicks > 0 ? goTotals.spend / goTotals.clicks : 0;
+
+  const cpas     = [liCpa, meCpa, goCpa];
+  const minCpa   = Math.min(...cpas.filter((c): c is number => c !== null));
+  const liWins   = liCpa !== null && liCpa === minCpa;
+  const meWins   = meCpa !== null && meCpa === minCpa && !liWins;
+  const goWins   = goCpa !== null && goCpa === minCpa && !liWins && !meWins;
   const bestChannel =
-    liCpa !== null && meCpa !== null
-      ? liCpa <= meCpa ? 'LinkedIn' : 'Meta'
-      : liCpa !== null ? 'LinkedIn'
-      : meCpa !== null ? 'Meta'
-      : '—';
+    liWins ? 'LinkedIn' : meWins ? 'Meta' : goWins ? 'Google Ads' : '—';
 
   // Campaign-level aggregation (for spotlight)
   const campaignSummaries = useMemo(() => {
@@ -274,7 +246,7 @@ export default function DashboardPage() {
                   value={bestChannel}
                   subtitle={
                     bestChannel !== '—'
-                      ? `Laagste CPA: ${bestChannel === 'LinkedIn' && liCpa !== null ? fmtEur(liCpa) : meCpa !== null ? fmtEur(meCpa) : '—'}`
+                      ? `Laagste CPA: ${fmtEur(minCpa)}`
                       : 'Geen conversiedata'
                   }
                 />
@@ -288,13 +260,14 @@ export default function DashboardPage() {
           <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Kanaalvergelijking</h2>
 
           {/* Channel cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             {loading ? (
-              <><ChannelCardSkeleton /><ChannelCardSkeleton /></>
+              <><ChannelCardSkeleton /><ChannelCardSkeleton /><ChannelCardSkeleton /></>
             ) : (
               <>
                 <ChannelCard platform="linkedin" spend={liTotals.spend} applicants={liTotals.conversions} clicks={liTotals.clicks} impressions={liTotals.impressions} isWinner={liWins} />
                 <ChannelCard platform="meta"     spend={meTotals.spend} applicants={meTotals.conversions} clicks={meTotals.clicks} impressions={meTotals.impressions} isWinner={meWins} />
+                <ChannelCard platform="google"   spend={goTotals.spend} applicants={goTotals.conversions} clicks={goTotals.clicks} impressions={goTotals.impressions} isWinner={goWins} />
               </>
             )}
           </div>
@@ -305,20 +278,38 @@ export default function DashboardPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 w-40">Metric</th>
+                    <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 w-36">Metric</th>
                     <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-[#0077B5]">LinkedIn</th>
                     <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-[#1877F2]">Meta</th>
-                    <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Verschil</th>
+                    <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-[#4285F4]">Google Ads</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <CompareRow label="Budget"          liValue={fmtEur(liTotals.spend)}         meValue={fmtEur(meTotals.spend)}         liRaw={liTotals.spend}       meRaw={meTotals.spend}       neutral />
-                  <CompareRow label="Impressies"       liValue={fmtNum(liTotals.impressions)}   meValue={fmtNum(meTotals.impressions)}   liRaw={liTotals.impressions} meRaw={meTotals.impressions} />
-                  <CompareRow label="Clicks"           liValue={fmtNum(liTotals.clicks)}        meValue={fmtNum(meTotals.clicks)}        liRaw={liTotals.clicks}      meRaw={meTotals.clicks} />
-                  <CompareRow label="CTR"              liValue={fmtPct(liCtr)}                  meValue={fmtPct(meCtr)}                  liRaw={liCtr}                meRaw={meCtr} />
-                  <CompareRow label="Kosten per klik"  liValue={liCpc > 0 ? fmtEur(liCpc) : '—'} meValue={meCpc > 0 ? fmtEur(meCpc) : '—'} liRaw={liCpc}            meRaw={meCpc}                lowerIsBetter />
-                  <CompareRow label="Sollicitanten"    liValue={fmtNum(liTotals.conversions)}   meValue={fmtNum(meTotals.conversions)}   liRaw={liTotals.conversions} meRaw={meTotals.conversions} />
-                  <CompareRow label="Kosten/soll."     liValue={liCpa !== null ? fmtEur(liCpa) : '—'} meValue={meCpa !== null ? fmtEur(meCpa) : '—'} liRaw={liCpa ?? 0} meRaw={meCpa ?? 0} lowerIsBetter />
+                  {[
+                    { label: 'Budget',         li: fmtEur(liTotals.spend),       me: fmtEur(meTotals.spend),       go: fmtEur(goTotals.spend),       liR: liTotals.spend,       meR: meTotals.spend,       goR: goTotals.spend,       neutral: true },
+                    { label: 'Impressies',     li: fmtNum(liTotals.impressions), me: fmtNum(meTotals.impressions), go: fmtNum(goTotals.impressions), liR: liTotals.impressions, meR: meTotals.impressions, goR: goTotals.impressions },
+                    { label: 'Clicks',         li: fmtNum(liTotals.clicks),      me: fmtNum(meTotals.clicks),      go: fmtNum(goTotals.clicks),      liR: liTotals.clicks,      meR: meTotals.clicks,      goR: goTotals.clicks },
+                    { label: 'CTR',            li: fmtPct(liCtr),                me: fmtPct(meCtr),                go: fmtPct(goCtr),                liR: liCtr,                meR: meCtr,                goR: goCtr },
+                    { label: 'Kosten/klik',    li: liCpc > 0 ? fmtEur(liCpc) : '—', me: meCpc > 0 ? fmtEur(meCpc) : '—', go: goCpc > 0 ? fmtEur(goCpc) : '—', liR: liCpc, meR: meCpc, goR: goCpc, lower: true },
+                    { label: 'Sollicitanten',  li: fmtNum(liTotals.conversions), me: fmtNum(meTotals.conversions), go: fmtNum(goTotals.conversions), liR: liTotals.conversions, meR: meTotals.conversions, goR: goTotals.conversions },
+                    { label: 'Kosten/soll.',   li: liCpa != null ? fmtEur(liCpa) : '—', me: meCpa != null ? fmtEur(meCpa) : '—', go: goCpa != null ? fmtEur(goCpa) : '—', liR: liCpa ?? 0, meR: meCpa ?? 0, goR: goCpa ?? 0, lower: true },
+                  ].map(({ label, li, me, go, liR, meR, goR, lower, neutral }) => {
+                    const best = lower
+                      ? Math.min(...[liR, meR, goR].filter(Boolean))
+                      : Math.max(liR, meR, goR);
+                    const win = (v: number) => !neutral && v === best && v > 0;
+                    return (
+                      <tr key={label} className="border-b border-gray-50 last:border-0">
+                        <td className="py-3 px-4 text-xs text-gray-500 font-medium">{label}</td>
+                        {([['LinkedIn', li, liR], ['Meta', me, meR], ['Google', go, goR]] as [string, string, number][]).map(([, val, raw]) => (
+                          <td key={val} className={`py-3 px-4 text-sm tabular-nums font-semibold ${win(raw) ? 'text-green-700' : 'text-gray-800'}`}>
+                            {win(raw) && <span className="mr-1 text-green-500">✓</span>}
+                            {val}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

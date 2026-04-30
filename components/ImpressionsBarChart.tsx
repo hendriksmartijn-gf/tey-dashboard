@@ -4,13 +4,16 @@ import { useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer,
 } from 'recharts';
-import type { CampaignRow, MetricKey } from '@/types/campaign';
+import type { CampaignRow, MetricKey, Platform } from '@/types/campaign';
 import { METRICS, getMetricValue, sumRows } from '@/types/campaign';
 
 interface Props { rows: CampaignRow[] }
 
-const LINKEDIN_COLOR = '#0077B5';
-const META_COLOR     = '#1877F2';
+const PLATFORM_COLOR: Record<Platform, string> = {
+  linkedin: '#0077B5',
+  meta:     '#1877F2',
+  google:   '#4285F4',
+};
 const METRIC_KEYS    = Object.keys(METRICS) as MetricKey[];
 
 export function ImpressionsBarChartSkeleton() {
@@ -27,7 +30,7 @@ export default function ImpressionsBarChart({ rows }: Props) {
   const { format } = METRICS[metric];
 
   // Aggregate by campaign name
-  const byCampaign: Record<string, { name: string; platform: 'linkedin' | 'meta'; rows: CampaignRow[] }> = {};
+  const byCampaign: Record<string, { name: string; platform: Platform; rows: CampaignRow[] }> = {};
   for (const r of rows) {
     if (!byCampaign[r.campaign_name]) {
       byCampaign[r.campaign_name] = { name: r.campaign_name, platform: r.platform, rows: [] };
@@ -73,18 +76,18 @@ export default function ImpressionsBarChart({ rows }: Props) {
               <Tooltip formatter={(v) => format(Number(v ?? 0))} />
               <Bar dataKey="value" name={METRICS[metric].label} radius={[0, 4, 4, 0]}>
                 {data.map((entry, i) => (
-                  <Cell key={i} fill={entry.platform === 'linkedin' ? LINKEDIN_COLOR : META_COLOR} fillOpacity={0.85} />
+                  <Cell key={i} fill={PLATFORM_COLOR[entry.platform]} fillOpacity={0.85} />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
           <div className="flex gap-4 mt-3 justify-end">
-            <span className="flex items-center gap-1.5 text-xs text-gray-500">
-              <span className="inline-block w-3 h-3 rounded-sm" style={{ background: LINKEDIN_COLOR }} /> LinkedIn
-            </span>
-            <span className="flex items-center gap-1.5 text-xs text-gray-500">
-              <span className="inline-block w-3 h-3 rounded-sm" style={{ background: META_COLOR }} /> Meta
-            </span>
+            {(Object.entries(PLATFORM_COLOR) as [Platform, string][]).map(([p, color]) => (
+              <span key={p} className="flex items-center gap-1.5 text-xs text-gray-500">
+                <span className="inline-block w-3 h-3 rounded-sm" style={{ background: color }} />
+                {p === 'linkedin' ? 'LinkedIn' : p === 'meta' ? 'Meta' : 'Google'}
+              </span>
+            ))}
           </div>
         </>
       )}

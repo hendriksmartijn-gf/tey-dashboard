@@ -64,6 +64,15 @@ export interface GoogleAdsDayRow {
   completions: number;
 }
 
+export interface GoogleAdsRawRow {
+  date:        string;
+  campaign:    string;
+  spend:       number;
+  clicks:      number;
+  impressions: number;
+  completions: number; // Sollicitatie_voltooid_recruitee
+}
+
 export interface AnalyticsSummary {
   byDay:                 AnalyticsDayRow[];
   conversionsBySource:   ConversionBySource[];
@@ -259,4 +268,96 @@ export async function getAnalyticsData(
     conversionsByCampaign,
     googleAds: { campaigns: adsCampaigns, byDay: adsByDay },
   };
+}
+
+// ── Google Ads rows (day × campaign) for main campaign view ───────────────────
+
+function normaliseDate(raw: string): string {
+  return raw.length === 8
+    ? `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`
+    : raw;
+}
+
+export async function getGoogleAdsRows(
+  startDate = '90daysAgo',
+  endDate   = 'today',
+): Promise<GoogleAdsRawRow[]> {
+  const propertyId = process.env.GA4_PROPERTY_ID;
+  if (!propertyId) throw new Error('Missing GA4_PROPERTY_ID env var');
+
+  const analytics  = getAnalyticsClient();
+  const property   = `properties/${propertyId}`;
+  const dateRanges = [{ startDate, endDate }];
+  const dims       = [{ name: 'date' }, { name: 'sessionGoogleAdsCampaignName' }];
+  const campaignFilter = {
+    filter: {
+      fieldName:    'sessionGoogleAdsCampaignName',
+      stringFilter: { matchType: 'PARTIAL_REGEXP' as const, value: '.' },
+    },
+  };
+
+  // Run both queries in parallel
+  const [spendRes, convRes] = await Promise.all([
+    // Spend / clicks / impressions by date × campaign
+    analytics.properties.runReport({
+      property,
+      requestBody: {
+        dateRanges,
+        dimensions: dims,
+        metrics: [
+          { name: 'advertiserAdCost' },
+          { name: 'advertiserAdClicks' },
+          { name: 'advertiserAdImpressions' },
+        ],
+        dimensionFilter: campaignFilter,
+        orderBys: [{ dimension: { dimensionName: 'date' }, desc: false }],
+      },
+    }),
+
+    // Recruitee completions by date × campaign
+    analytics.properties.runReport({
+      property,
+      requestBody: {
+        dateRanges,
+        dimensions: dims,
+        metrics: [{ name: 'eventCount' }],
+        dimensionFilter: {
+          andGroup: {
+            expressions: [
+              campaignFilter,
+              { filter: { fieldName: 'eventName', stringFilter: { matchType: 'EXACT', value: CONVERSION_EVENT } } },
+            ],
+          },
+        },
+        orderBys: [{ dimension: { dimensionName: 'date' }, desc: false }],
+      },
+    }).catch(() => ({ data: { rows: [] } })),
+  ]);
+
+  // Build completions lookup: date::campaign → count
+  const convMap = new Map<string, number>();
+  for (const row of convRes.data.rows ?? []) {
+    const date     = normaliseDate(row.dimensionValues?.[0]?.value ?? '');
+    const campaign = row.dimensionValues?.[1]?.value ?? '';
+    const count    = Number(row.metricValues?.[0]?.value ?? 0);
+    convMap.set(`${date}::${campaign}`, count);
+  }
+
+  // Merge spend + completions
+  const result: GoogleAdsRawRow[] = (spendRes.data.rows ?? [])
+    .map((row) => {
+      const date     = normaliseDate(row.dimensionValues?.[0]?.value ?? '');
+      const campaign = row.dimensionValues?.[1]?.value ?? '(unknown)';
+      return {
+        date,
+        campaign,
+        spend:       Number(row.metricValues?.[0]?.value ?? 0),
+        clicks:      Number(row.metricValues?.[1]?.value ?? 0),
+        impressions: Number(row.metricValues?.[2]?.value ?? 0),
+        completions: convMap.get(`${date}::${campaign}`) ?? 0,
+      };
+    })
+    .filter((r) => r.spend > 0 || r.clicks > 0);
+
+  return result;
 }

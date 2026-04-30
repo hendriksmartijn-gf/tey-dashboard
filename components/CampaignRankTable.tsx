@@ -25,10 +25,12 @@ const fmtNum = (n: number) => n.toLocaleString('nl-NL');
 const PLATFORM_COLOR: Record<Platform, string> = {
   linkedin: '#0077B5',
   meta:     '#1877F2',
+  google:   '#4285F4',
 };
 const PLATFORM_LABEL: Record<Platform, string> = {
   linkedin: 'LinkedIn',
   meta:     'Meta',
+  google:   'Google',
 };
 
 export function CampaignRankTableSkeleton() {

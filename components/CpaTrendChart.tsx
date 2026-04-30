@@ -10,6 +10,7 @@ interface Props { rows: CampaignRow[] }
 
 const LINKEDIN_COLOR = '#0077B5';
 const META_COLOR     = '#1877F2';
+const GOOGLE_COLOR   = '#4285F4';
 
 const fmtEur = (v: number) =>
   v.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
@@ -47,17 +48,20 @@ export function CpaTrendChartSkeleton() {
 
 export default function CpaTrendChart({ rows }: Props) {
   // Aggregate by date × platform
-  const byDate: Record<string, { li_spend: number; li_conv: number; me_spend: number; me_conv: number }> = {};
+  const byDate: Record<string, { li_spend: number; li_conv: number; me_spend: number; me_conv: number; go_spend: number; go_conv: number }> = {};
 
   for (const r of rows) {
     if (!r.date) continue;
-    if (!byDate[r.date]) byDate[r.date] = { li_spend: 0, li_conv: 0, me_spend: 0, me_conv: 0 };
+    if (!byDate[r.date]) byDate[r.date] = { li_spend: 0, li_conv: 0, me_spend: 0, me_conv: 0, go_spend: 0, go_conv: 0 };
     if (r.platform === 'linkedin') {
       byDate[r.date].li_spend += r.spend;
       byDate[r.date].li_conv  += r.conversions;
-    } else {
+    } else if (r.platform === 'meta') {
       byDate[r.date].me_spend += r.spend;
       byDate[r.date].me_conv  += r.conversions;
+    } else {
+      byDate[r.date].go_spend += r.spend;
+      byDate[r.date].go_conv  += r.conversions;
     }
   }
 
@@ -65,8 +69,9 @@ export default function CpaTrendChart({ rows }: Props) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, v]) => ({
       date,
-      LinkedIn: v.li_conv > 0 ? v.li_spend / v.li_conv : null,
-      Meta:     v.me_conv > 0 ? v.me_spend / v.me_conv : null,
+      LinkedIn:    v.li_conv > 0 ? v.li_spend / v.li_conv : null,
+      Meta:        v.me_conv > 0 ? v.me_spend / v.me_conv : null,
+      'Google Ads': v.go_conv > 0 ? v.go_spend / v.go_conv : null,
     }));
 
   if (data.length === 0) {
@@ -110,6 +115,15 @@ export default function CpaTrendChart({ rows }: Props) {
             type="monotone"
             dataKey="Meta"
             stroke={META_COLOR}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4 }}
+            connectNulls={false}
+          />
+          <Line
+            type="monotone"
+            dataKey="Google Ads"
+            stroke={GOOGLE_COLOR}
             strokeWidth={2}
             dot={false}
             activeDot={{ r: 4 }}

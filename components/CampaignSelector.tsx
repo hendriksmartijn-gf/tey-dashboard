@@ -1,9 +1,12 @@
 'use client';
 
-import type { CampaignRow } from '@/types/campaign';
+import type { CampaignRow, Platform } from '@/types/campaign';
 
-const LINKEDIN_COLOR = '#0077B5';
-const META_COLOR = '#1877F2';
+const PLATFORM_COLOR: Record<Platform, string> = {
+  linkedin: '#0077B5',
+  meta:     '#1877F2',
+  google:   '#4285F4',
+};
 
 interface Props {
   rows: CampaignRow[];
@@ -13,7 +16,7 @@ interface Props {
 
 export default function CampaignSelector({ rows, selected, onChange }: Props) {
   // Unique campaigns, preserving first-seen platform
-  const campaigns: { name: string; platform: 'linkedin' | 'meta' }[] = [];
+  const campaigns: { name: string; platform: Platform }[] = [];
   const seen = new Set<string>();
   for (const r of rows) {
     if (!seen.has(r.campaign_name)) {
@@ -34,24 +37,24 @@ export default function CampaignSelector({ rows, selected, onChange }: Props) {
   function selectAll()   { onChange(new Set(campaigns.map((c) => c.name))); }
   function deselectAll() { onChange(new Set()); }
 
-  function selectGroup(platform: 'linkedin' | 'meta') {
+  function selectGroup(platform: Platform) {
     const next = new Set(selected);
     campaigns.filter((c) => c.platform === platform).forEach((c) => next.add(c.name));
     onChange(next);
   }
 
-  function deselectGroup(platform: 'linkedin' | 'meta') {
+  function deselectGroup(platform: Platform) {
     const next = new Set(selected);
     campaigns.filter((c) => c.platform === platform).forEach((c) => next.delete(c.name));
     onChange(next);
   }
 
-  function isGroupChecked(platform: 'linkedin' | 'meta') {
+  function isGroupChecked(platform: Platform) {
     return campaigns.filter((c) => c.platform === platform).every((c) => selected.has(c.name));
   }
 
-  function Group({ platform, list, color }: { platform: 'linkedin' | 'meta'; list: typeof campaigns; color: string }) {
-    const label = platform === 'linkedin' ? 'LinkedIn' : 'Meta';
+  function Group({ platform, list, color }: { platform: Platform; list: typeof campaigns; color: string }) {
+    const label = platform === 'linkedin' ? 'LinkedIn' : platform === 'meta' ? 'Meta' : 'Google Ads';
     const allChecked = isGroupChecked(platform);
     return (
       <div>
@@ -106,8 +109,9 @@ export default function CampaignSelector({ rows, selected, onChange }: Props) {
       </div>
       {/* Lists */}
       <div className="p-1 max-h-[70vh] overflow-y-auto space-y-1">
-        {linkedin.length > 0 && <Group platform="linkedin" list={linkedin} color={LINKEDIN_COLOR} />}
-        {meta.length    > 0 && <Group platform="meta"     list={meta}     color={META_COLOR} />}
+        {linkedin.length > 0 && <Group platform="linkedin" list={linkedin} color={PLATFORM_COLOR.linkedin} />}
+        {meta.length    > 0 && <Group platform="meta"     list={meta}     color={PLATFORM_COLOR.meta} />}
+        {campaigns.filter(c => c.platform === 'google').length > 0 && <Group platform="google" list={campaigns.filter(c => c.platform === 'google')} color={PLATFORM_COLOR.google} />}
       </div>
       {/* Footer count */}
       <div className="px-3 py-2 border-t border-gray-100 text-xs text-gray-400">

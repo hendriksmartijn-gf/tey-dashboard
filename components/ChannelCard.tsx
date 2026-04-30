@@ -1,5 +1,5 @@
 interface Props {
-  platform: 'linkedin' | 'meta';
+  platform: 'linkedin' | 'meta' | 'google';
   spend: number;
   applicants: number;
   clicks: number;
@@ -15,8 +15,9 @@ const fmtNum = (n: number) => n.toLocaleString('nl-NL');
 const fmtPct = (n: number) => `${(n * 100).toFixed(2)}%`;
 
 const CONFIG = {
-  linkedin: { label: 'LinkedIn', color: '#0077B5' },
+  linkedin: { label: 'LinkedIn',       color: '#0077B5' },
   meta:     { label: 'Meta / Facebook', color: '#1877F2' },
+  google:   { label: 'Google Ads',      color: '#4285F4' },
 };
 
 export function ChannelCardSkeleton() {
