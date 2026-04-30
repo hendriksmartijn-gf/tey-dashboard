@@ -217,7 +217,7 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
           <RealCpaCard
             platform="meta"
             label="Meta / Facebook"
-            color="#E02D3C"
+            color="#1877F2"
             completions={completionsByPlatform.meta}
             spend={meSpend}
           />
@@ -285,7 +285,7 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
                 const ch = sourceToChannel(r.source);
                 const color =
                   ch === 'linkedin' ? '#0077B5' :
-                  ch === 'meta'     ? '#E02D3C' :
+                  ch === 'meta'     ? '#1877F2' :
                   ch === 'google'   ? '#F59E0B' : '#9ca3af';
                 const darkText = ch === 'google';
                 const isUnset = r.campaign === '(not set)';

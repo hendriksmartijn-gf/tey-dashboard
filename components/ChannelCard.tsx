@@ -16,7 +16,7 @@ const fmtPct = (n: number) => `${(n * 100).toFixed(2)}%`;
 
 const CONFIG = {
   linkedin: { label: 'LinkedIn',       color: '#0077B5' },
-  meta:     { label: 'Meta / Facebook', color: '#E02D3C' },
+  meta:     { label: 'Meta / Facebook', color: '#1877F2' },
   google:   { label: 'Google Ads',      color: '#F59E0B' },
 };
 

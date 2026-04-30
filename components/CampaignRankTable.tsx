@@ -24,7 +24,7 @@ const fmtNum = (n: number) => n.toLocaleString('nl-NL');
 
 const PLATFORM_COLOR: Record<Platform, string> = {
   linkedin: '#0077B5',
-  meta:     '#E02D3C',
+  meta:     '#1877F2',
   google:   '#F59E0B',
 };
 const PLATFORM_LABEL: Record<Platform, string> = {

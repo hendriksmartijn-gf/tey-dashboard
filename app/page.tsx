@@ -44,7 +44,7 @@ function presetRange(preset: Preset, customFrom: string, customTo: string) {
 // ── Platform config ───────────────────────────────────────────────────────────
 const PLATFORM_COLOR: Record<Platform, string> = {
   linkedin: '#0077B5',
-  meta:     '#E02D3C',
+  meta:     '#1877F2',
   google:   '#F59E0B',
 };
 const PLATFORM_LABEL: Record<Platform, string> = {
@@ -231,8 +231,8 @@ export default function DashboardPage() {
       <div className="sticky top-14 z-10 bg-white" style={{ borderBottom: '1px solid #DCE0E6' }}>
         <div className="max-w-[1280px] mx-auto px-6">
 
-          {/* Row 1: tabs */}
-          <div className="flex items-end gap-0 pt-3">
+          {/* Row 1: tabs — pill segment control */}
+          <div className="flex items-center gap-2 pt-3 pb-3">
             {([
               { key: 'ads' as Tab,  label: 'Advertenties' },
               { key: 'ga4' as Tab,  label: 'GA4 — Website' },
@@ -242,10 +242,13 @@ export default function DashboardPage() {
                 <button
                   key={key}
                   onClick={() => setTab(key)}
-                  className="relative px-4 pb-3 text-sm font-semibold transition-colors"
+                  className="px-5 py-2 text-sm font-bold transition-all"
                   style={{
-                    color: active ? '#6331F4' : '#8C9BAF',
-                    borderBottom: active ? '2px solid #6331F4' : '2px solid transparent',
+                    borderRadius: '6px',
+                    background: active ? '#12101F' : 'transparent',
+                    color:      active ? '#ffffff'  : '#8C9BAF',
+                    border:     `1.5px solid ${active ? '#12101F' : '#DCE0E6'}`,
+                    letterSpacing: '-0.01em',
                   }}
                 >
                   {label}
@@ -255,7 +258,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Row 2: period presets */}
-          <div className="flex flex-wrap items-center gap-2 py-2.5">
+          <div className="flex flex-wrap items-center gap-2 pb-3">
             <span className="gf-eyebrow mr-1 hidden sm:inline-flex">Periode</span>
             <div className="flex items-center gap-1.5 flex-wrap">
               {presets.map(({ key, label }) => {
@@ -382,7 +385,7 @@ export default function DashboardPage() {
                       <tr>
                         <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider w-36" style={{ color: '#8C9BAF' }}>Metric</th>
                         <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#0077B5' }}>LinkedIn</th>
-                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#E02D3C' }}>Meta</th>
+                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#1877F2' }}>Meta</th>
                         <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#F59E0B' }}>Google Ads</th>
                       </tr>
                     </thead>
