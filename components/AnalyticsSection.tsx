@@ -5,7 +5,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts';
-import type { AnalyticsDayRow, ConversionBySource, ConversionByCampaign } from '@/lib/analytics';
+import type { AnalyticsDayRow, ConversionBySource, ConversionByCampaign, GoogleAdsCampaignRow, GoogleAdsDayRow } from '@/lib/analytics';
+import GoogleAdsSection, { GoogleAdsSectionSkeleton } from '@/components/GoogleAdsSection';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,10 @@ interface AnalyticsData {
   byDay:                 AnalyticsDayRow[];
   conversionsBySource:   ConversionBySource[];
   conversionsByCampaign: ConversionByCampaign[];
+  googleAds: {
+    campaigns: GoogleAdsCampaignRow[];
+    byDay:     GoogleAdsDayRow[];
+  };
 }
 
 export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpend = 0 }: Props) {
@@ -326,6 +331,19 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
           </div>
         );
       })()}
+
+      {/* ── Google Ads ── */}
+      <div>
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Google Ads</h3>
+        {loading ? (
+          <GoogleAdsSectionSkeleton />
+        ) : (
+          <GoogleAdsSection
+            campaigns={data?.googleAds.campaigns ?? []}
+            byDay={data?.googleAds.byDay ?? []}
+          />
+        )}
+      </div>
 
     </div>
   );

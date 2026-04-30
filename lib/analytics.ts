@@ -33,21 +33,45 @@ export interface AnalyticsDayRow {
 }
 
 export interface ConversionBySource {
-  source: string;   // e.g. 'linkedin.com', 'facebook'
-  medium: string;   // e.g. 'cpc', 'paid-social'
+  source: string;
+  medium: string;
   completions: number;
 }
 
 export interface ConversionByCampaign {
-  campaign: string; // utm_campaign value
+  campaign: string;
   source: string;
   completions: number;
 }
 
+export interface GoogleAdsCampaignRow {
+  campaign:    string;
+  network:     string; // Search, Display, YouTube, etc.
+  spend:       number; // advertiserAdCost (EUR)
+  clicks:      number;
+  impressions: number;
+  completions: number; // Sollicitatie_voltooid_recruitee
+  cpc:         number;
+  ctr:         number;
+  cpa:         number;
+}
+
+export interface GoogleAdsDayRow {
+  date:        string;
+  spend:       number;
+  clicks:      number;
+  impressions: number;
+  completions: number;
+}
+
 export interface AnalyticsSummary {
-  byDay: AnalyticsDayRow[];
-  conversionsBySource: ConversionBySource[];
+  byDay:                 AnalyticsDayRow[];
+  conversionsBySource:   ConversionBySource[];
   conversionsByCampaign: ConversionByCampaign[];
+  googleAds: {
+    campaigns: GoogleAdsCampaignRow[];
+    byDay:     GoogleAdsDayRow[];
+  };
 }
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
@@ -63,10 +87,9 @@ export async function getAnalyticsData(
   const property   = `properties/${propertyId}`;
   const dateRanges = [{ startDate, endDate }];
 
-  // Run all 3 queries in parallel
-  const [sessionRes, sourceRes, campaignRes] = await Promise.all([
+  const [sessionRes, sourceRes, campaignRes, adsRes, adsDayRes] = await Promise.all([
 
-    // 1. Sessions + key events by date × channel (existing)
+    // 1. Sessions + key events by date × channel
     analytics.properties.runReport({
       property,
       requestBody: {
@@ -77,7 +100,7 @@ export async function getAnalyticsData(
       },
     }),
 
-    // 2. Sollicitatie_voltooid_recruitee by source + medium
+    // 2. Recruitee completions by source + medium
     analytics.properties.runReport({
       property,
       requestBody: {
@@ -85,16 +108,13 @@ export async function getAnalyticsData(
         dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
         metrics:    [{ name: 'eventCount' }],
         dimensionFilter: {
-          filter: {
-            fieldName:    'eventName',
-            stringFilter: { matchType: 'EXACT', value: CONVERSION_EVENT },
-          },
+          filter: { fieldName: 'eventName', stringFilter: { matchType: 'EXACT', value: CONVERSION_EVENT } },
         },
         orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
       },
     }),
 
-    // 3. Sollicitatie_voltooid_recruitee by campaign + source
+    // 3. Recruitee completions by UTM campaign + source
     analytics.properties.runReport({
       property,
       requestBody: {
@@ -102,14 +122,59 @@ export async function getAnalyticsData(
         dimensions: [{ name: 'sessionCampaignName' }, { name: 'sessionSource' }],
         metrics:    [{ name: 'eventCount' }],
         dimensionFilter: {
-          filter: {
-            fieldName:    'eventName',
-            stringFilter: { matchType: 'EXACT', value: CONVERSION_EVENT },
-          },
+          filter: { fieldName: 'eventName', stringFilter: { matchType: 'EXACT', value: CONVERSION_EVENT } },
         },
         orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
       },
     }),
+
+    // 4. Google Ads — campaign level (cost, clicks, impressions + conversions)
+    analytics.properties.runReport({
+      property,
+      requestBody: {
+        dateRanges,
+        dimensions: [
+          { name: 'sessionGoogleAdsCampaignName' },
+          { name: 'sessionGoogleAdsAdNetworkType' },
+        ],
+        metrics: [
+          { name: 'advertiserAdCost' },
+          { name: 'advertiserAdClicks' },
+          { name: 'advertiserAdImpressions' },
+          { name: 'keyEvents' },
+        ],
+        dimensionFilter: {
+          // Only rows where a Google Ads campaign name is set
+          filter: {
+            fieldName:    'sessionGoogleAdsCampaignName',
+            stringFilter: { matchType: 'PARTIAL_REGEXP', value: '.' },
+          },
+        },
+        orderBys: [{ metric: { metricName: 'advertiserAdCost' }, desc: true }],
+      },
+    }).catch(() => ({ data: { rows: [] } })), // graceful fallback if Ads not linked
+
+    // 5. Google Ads — daily trend
+    analytics.properties.runReport({
+      property,
+      requestBody: {
+        dateRanges,
+        dimensions: [{ name: 'date' }],
+        metrics: [
+          { name: 'advertiserAdCost' },
+          { name: 'advertiserAdClicks' },
+          { name: 'advertiserAdImpressions' },
+          { name: 'keyEvents' },
+        ],
+        dimensionFilter: {
+          filter: {
+            fieldName:    'sessionGoogleAdsCampaignName',
+            stringFilter: { matchType: 'PARTIAL_REGEXP', value: '.' },
+          },
+        },
+        orderBys: [{ dimension: { dimensionName: 'date' }, desc: false }],
+      },
+    }).catch(() => ({ data: { rows: [] } })),
   ]);
 
   // ── Parse sessions by day ───────────────────────────────────────────────────
@@ -129,7 +194,7 @@ export async function getAnalyticsData(
     };
   });
 
-  // ── Parse completions by source ─────────────────────────────────────────────
+  // ── Parse Recruitee completions by source ───────────────────────────────────
   const conversionsBySource: ConversionBySource[] = (sourceRes.data.rows ?? [])
     .map((row) => ({
       source:      row.dimensionValues?.[0]?.value ?? 'unknown',
@@ -138,7 +203,7 @@ export async function getAnalyticsData(
     }))
     .filter((r) => r.completions > 0);
 
-  // ── Parse completions by campaign ───────────────────────────────────────────
+  // ── Parse Recruitee completions by UTM campaign ─────────────────────────────
   const conversionsByCampaign: ConversionByCampaign[] = (campaignRes.data.rows ?? [])
     .map((row) => ({
       campaign:    row.dimensionValues?.[0]?.value ?? '(not set)',
@@ -147,5 +212,51 @@ export async function getAnalyticsData(
     }))
     .filter((r) => r.completions > 0 && r.campaign !== '(not set)');
 
-  return { byDay, conversionsBySource, conversionsByCampaign };
+  // ── Parse Google Ads campaigns ──────────────────────────────────────────────
+  const adsCampaigns: GoogleAdsCampaignRow[] = (adsRes.data.rows ?? [])
+    .map((row) => {
+      const dims    = row.dimensionValues ?? [];
+      const metrics = row.metricValues   ?? [];
+      const spend       = Number(metrics[0]?.value ?? 0);
+      const clicks      = Number(metrics[1]?.value ?? 0);
+      const impressions = Number(metrics[2]?.value ?? 0);
+      const completions = Number(metrics[3]?.value ?? 0);
+      return {
+        campaign:    dims[0]?.value ?? '(unknown)',
+        network:     dims[1]?.value ?? '(unknown)',
+        spend,
+        clicks,
+        impressions,
+        completions,
+        cpc: clicks      > 0 ? spend / clicks      : 0,
+        ctr: impressions > 0 ? clicks / impressions : 0,
+        cpa: completions > 0 ? spend / completions  : 0,
+      };
+    })
+    .filter((r) => r.spend > 0 || r.clicks > 0);
+
+  // ── Parse Google Ads daily trend ────────────────────────────────────────────
+  const adsByDay: GoogleAdsDayRow[] = (adsDayRes.data.rows ?? [])
+    .map((row) => {
+      const dims    = row.dimensionValues ?? [];
+      const metrics = row.metricValues   ?? [];
+      const rawDate = dims[0]?.value ?? '';
+      const date    = rawDate.length === 8
+        ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
+        : rawDate;
+      return {
+        date,
+        spend:       Number(metrics[0]?.value ?? 0),
+        clicks:      Number(metrics[1]?.value ?? 0),
+        impressions: Number(metrics[2]?.value ?? 0),
+        completions: Number(metrics[3]?.value ?? 0),
+      };
+    });
+
+  return {
+    byDay,
+    conversionsBySource,
+    conversionsByCampaign,
+    googleAds: { campaigns: adsCampaigns, byDay: adsByDay },
+  };
 }
