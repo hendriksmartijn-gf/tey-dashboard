@@ -16,8 +16,8 @@ const fmtPct = (n: number) => `${(n * 100).toFixed(2)}%`;
 
 const CONFIG = {
   linkedin: { label: 'LinkedIn',       color: '#0077B5' },
-  meta:     { label: 'Meta / Facebook', color: '#1877F2' },
-  google:   { label: 'Google Ads',      color: '#4285F4' },
+  meta:     { label: 'Meta / Facebook', color: '#E02D3C' },
+  google:   { label: 'Google Ads',      color: '#F59E0B' },
 };
 
 export function ChannelCardSkeleton() {
@@ -47,16 +47,16 @@ export default function ChannelCard({ platform, spend, applicants, clicks, impre
     <div
       className="bg-white rounded-lg p-6 relative"
       style={{
-        border: `1px solid ${isWinner ? '#6331F4' : '#DCE0E6'}`,
+        border: `1px solid ${isWinner ? '#16A34A' : '#DCE0E6'}`,
         boxShadow: isWinner
-          ? '0 8px 24px rgba(18,16,34,0.08), 0 0 0 1px #6331F4'
+          ? '0 8px 24px rgba(18,16,34,0.08), 0 0 0 1px #16A34A'
           : '0 8px 24px rgba(18,16,34,0.08)',
       }}
     >
       {isWinner && (
         <span
           className="absolute top-4 right-4 text-xs font-bold px-2 py-0.5 rounded"
-          style={{ background: '#E2DBFF', color: '#6331F4' }}
+          style={{ background: '#DCFCE7', color: '#16A34A' }}
         >
           Beste CPA
         </span>

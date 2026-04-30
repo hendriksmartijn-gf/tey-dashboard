@@ -44,8 +44,8 @@ function presetRange(preset: Preset, customFrom: string, customTo: string) {
 // ── Platform config ───────────────────────────────────────────────────────────
 const PLATFORM_COLOR: Record<Platform, string> = {
   linkedin: '#0077B5',
-  meta:     '#1877F2',
-  google:   '#4285F4',
+  meta:     '#E02D3C',
+  google:   '#F59E0B',
 };
 const PLATFORM_LABEL: Record<Platform, string> = {
   linkedin: 'LinkedIn',
@@ -382,8 +382,8 @@ export default function DashboardPage() {
                       <tr>
                         <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider w-36" style={{ color: '#8C9BAF' }}>Metric</th>
                         <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#0077B5' }}>LinkedIn</th>
-                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#1877F2' }}>Meta</th>
-                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#4285F4' }}>Google Ads</th>
+                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#E02D3C' }}>Meta</th>
+                        <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#F59E0B' }}>Google Ads</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -406,8 +406,8 @@ export default function DashboardPage() {
                             {([li, me, go] as string[]).map((val, i) => {
                               const raw = [liR, meR, goR][i] as number;
                               return (
-                                <td key={i} className="py-3 px-4 text-sm tabular-nums font-semibold" style={{ color: win(raw) ? '#6331F4' : '#12101F' }}>
-                                  {win(raw) && <span className="mr-1" style={{ color: '#6331F4' }}>✓</span>}
+                                <td key={i} className="py-3 px-4 text-sm tabular-nums font-semibold" style={{ color: win(raw) ? '#16A34A' : '#12101F' }}>
+                                  {win(raw) && <span className="mr-1" style={{ color: '#16A34A' }}>✓</span>}
                                   {val}
                                 </td>
                               );
@@ -437,14 +437,14 @@ export default function DashboardPage() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {bestCpaCampaign ? (
-                    <SpotlightCard badge="🏆" badgeColor="#6331F4" title="Beste CPA" campaignName={bestCpaCampaign.campaign_name} platform={bestCpaCampaign.platform} metric={fmtEur(bestCpaCampaign.cpa)} metricLabel="CPA" />
+                    <SpotlightCard badge="🏆" badgeColor="#16A34A" title="Beste CPA" campaignName={bestCpaCampaign.campaign_name} platform={bestCpaCampaign.platform} metric={fmtEur(bestCpaCampaign.cpa)} metricLabel="CPA" />
                   ) : (
                     <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>
                       Geen conversiedata beschikbaar
                     </div>
                   )}
                   {bestCpcCampaign ? (
-                    <SpotlightCard badge="🖱️" badgeColor="#6331F4" title="Laagste CPC" campaignName={bestCpcCampaign.campaign_name} platform={bestCpcCampaign.platform} metric={fmtEur(bestCpcCampaign.cpc)} metricLabel="CPC" />
+                    <SpotlightCard badge="🖱️" badgeColor="#16A34A" title="Laagste CPC" campaignName={bestCpcCampaign.campaign_name} platform={bestCpcCampaign.platform} metric={fmtEur(bestCpcCampaign.cpc)} metricLabel="CPC" />
                   ) : (
                     <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>
                       Geen klikdata beschikbaar

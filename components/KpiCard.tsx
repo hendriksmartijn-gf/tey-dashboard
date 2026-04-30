@@ -20,7 +20,7 @@ export default function KpiCard({ title, value, subtitle, accent }: KpiCardProps
     <div
       className="bg-white rounded-lg p-5"
       style={{
-        border: `1px solid ${accent ? '#6331F4' : '#DCE0E6'}`,
+        border: `1px solid ${accent ? '#16A34A' : '#DCE0E6'}`,
         boxShadow: '0 8px 24px rgba(18,16,34,0.08)',
       }}
     >

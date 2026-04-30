@@ -217,7 +217,7 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
           <RealCpaCard
             platform="meta"
             label="Meta / Facebook"
-            color="#1877F2"
+            color="#E02D3C"
             completions={completionsByPlatform.meta}
             spend={meSpend}
           />
@@ -285,8 +285,9 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
                 const ch = sourceToChannel(r.source);
                 const color =
                   ch === 'linkedin' ? '#0077B5' :
-                  ch === 'meta'     ? '#1877F2' :
-                  ch === 'google'   ? '#4285F4' : '#9ca3af';
+                  ch === 'meta'     ? '#E02D3C' :
+                  ch === 'google'   ? '#F59E0B' : '#9ca3af';
+                const darkText = ch === 'google';
                 const isUnset = r.campaign === '(not set)';
                 return (
                   <tr key={i} className="hover:bg-gray-50 transition-colors">
@@ -295,7 +296,7 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
                       {isUnset ? '— geen UTM-campagne —' : r.campaign}
                     </td>
                     <td className="px-5 py-3">
-                      <span className="text-xs font-bold px-2 py-0.5 text-white" style={{ background: color, borderRadius: '4px' }}>
+                      <span className="text-xs font-bold px-2 py-0.5" style={{ background: color, borderRadius: '4px', color: darkText ? '#12101F' : '#ffffff' }}>
                         {r.source}
                       </span>
                     </td>

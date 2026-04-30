@@ -24,8 +24,8 @@ const fmtNum = (n: number) => n.toLocaleString('nl-NL');
 
 const PLATFORM_COLOR: Record<Platform, string> = {
   linkedin: '#0077B5',
-  meta:     '#1877F2',
-  google:   '#4285F4',
+  meta:     '#E02D3C',
+  google:   '#F59E0B',
 };
 const PLATFORM_LABEL: Record<Platform, string> = {
   linkedin: 'LinkedIn',
@@ -122,7 +122,7 @@ export default function CampaignRankTable({ rows }: Props) {
                   key={`${c.platform}-${c.campaign_name}`}
                   style={{
                     borderBottom: '1px solid #F0F4F8',
-                    background: isTop ? 'rgba(99,49,244,0.03)' : undefined,
+                    background: isTop ? 'rgba(22,163,74,0.04)' : undefined,
                   }}
                   className="transition-colors hover:bg-[#F0F4F8]/60"
                 >
@@ -134,11 +134,15 @@ export default function CampaignRankTable({ rows }: Props) {
                     {c.campaign_name}
                   </td>
 
-                  {/* Platform badge */}
+                  {/* Platform badge — Google uses dark text on yellow */}
                   <td className="px-5 py-3.5">
                     <span
-                      className="inline-block px-2 py-0.5 text-white text-xs font-bold whitespace-nowrap"
-                      style={{ background: color, borderRadius: '4px' }}
+                      className="inline-block px-2 py-0.5 text-xs font-bold whitespace-nowrap"
+                      style={{
+                        background: color,
+                        borderRadius: '4px',
+                        color: c.platform === 'google' ? '#12101F' : '#ffffff',
+                      }}
                     >
                       {PLATFORM_LABEL[c.platform]}
                     </span>
@@ -165,7 +169,7 @@ export default function CampaignRankTable({ rows }: Props) {
                   </td>
 
                   {/* CPA */}
-                  <td className="px-5 py-3.5 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: isTop ? '#6331F4' : '#12101F' }}>
+                  <td className="px-5 py-3.5 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: isTop ? '#16A34A' : '#12101F' }}>
                     {c.cpa !== Infinity ? fmtEur(c.cpa) : '—'}
                   </td>
 

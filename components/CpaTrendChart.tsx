@@ -9,8 +9,8 @@ import type { CampaignRow } from '@/types/campaign';
 interface Props { rows: CampaignRow[] }
 
 const LINKEDIN_COLOR = '#0077B5';
-const META_COLOR     = '#1877F2';
-const GOOGLE_COLOR   = '#4285F4';
+const META_COLOR     = '#E02D3C';
+const GOOGLE_COLOR   = '#F59E0B';
 
 const fmtEur = (v: number) =>
   v.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
