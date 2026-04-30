@@ -14,12 +14,12 @@ const fmtNum = (n: number) => n.toLocaleString('nl-NL');
 const fmtEur = (n: number) =>
   n.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
 
-function sourceToChannel(source: string, medium: string): 'linkedin' | 'meta' | 'other' {
+function sourceToChannel(source: string): 'linkedin' | 'meta' | 'google' | 'other' {
   const s = source.toLowerCase();
-  const m = medium.toLowerCase();
-  if (s.includes('linkedin'))                         return 'linkedin';
-  if (s.includes('facebook') || s.includes('instagram') || s.includes('fb')) return 'meta';
-  if (m.includes('paid') && s.includes('social'))    return 'other';
+  if (s.includes('linkedin') || s.includes('lnkd'))                                    return 'linkedin';
+  if (s.includes('facebook') || s.includes('instagram') || s.includes('fb') ||
+      s.includes('meta')     || s === 'ig')                                             return 'meta';
+  if (s.includes('google')   || s.includes('goog'))                                    return 'google';
   return 'other';
 }
 
@@ -160,15 +160,16 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
       .map(([date, v]) => ({ date: date.slice(5), ...v }));
   }, [data]);
 
-  // Aggregate Recruitee completions by LinkedIn / Meta / other
+  // Aggregate Recruitee completions by platform — derived from conversionsByCampaign
+  // so these totals always match the campaign table below (single source of truth).
   const completionsByPlatform = useMemo(() => {
-    if (!data) return { linkedin: 0, meta: 0, other: 0 };
-    return data.conversionsBySource.reduce(
+    if (!data) return { linkedin: 0, meta: 0, google: 0, other: 0 };
+    return data.conversionsByCampaign.reduce(
       (acc, r) => {
-        const ch = sourceToChannel(r.source, r.medium);
-        return { ...acc, [ch]: acc[ch] + r.completions };
+        const ch = sourceToChannel(r.source);
+        return { ...acc, [ch]: acc[ch as keyof typeof acc] + r.completions };
       },
-      { linkedin: 0, meta: 0, other: 0 }
+      { linkedin: 0, meta: 0, google: 0, other: 0 }
     );
   }, [data]);
 
@@ -190,8 +191,10 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
     );
   }
 
+  const totalCompletions = completionsByPlatform.linkedin + completionsByPlatform.meta +
+                           completionsByPlatform.google  + completionsByPlatform.other;
   const convRate = totals.sessions > 0
-    ? ((completionsByPlatform.linkedin + completionsByPlatform.meta + completionsByPlatform.other) / totals.sessions * 100).toFixed(2)
+    ? (totalCompletions / totals.sessions * 100).toFixed(2)
     : '—';
 
   return (
@@ -199,8 +202,9 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
 
       {/* ── Real CPA section ── */}
       <div>
-        <p className="text-xs text-gray-400 mb-3">
-          Gebaseerd op <strong className="text-gray-600">Sollicitatie_voltooid_recruitee</strong> events in GA4 — gekoppeld aan ad spend via UTM-parameters.
+        <p className="text-xs text-[#8C9BAF] mb-3">
+          Sollicitaties geteld via <strong className="text-[#555E6C]">Sollicitatie_voltooid_recruitee</strong> in GA4, gekoppeld aan kanaal via UTM-source.
+          Spend komt uit de advertentieplatformen (Ads-tab).
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <RealCpaCard
@@ -230,7 +234,7 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-1">Voltooide sollicitaties</p>
           <p className="text-2xl font-bold text-gray-900 tabular-nums">
-            {fmtNum(completionsByPlatform.linkedin + completionsByPlatform.meta + completionsByPlatform.other)}
+            {fmtNum(totalCompletions)}
           </p>
           <p className="text-xs text-gray-400 mt-1">Via Recruitee (GA4)</p>
         </div>
@@ -278,19 +282,24 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
             </thead>
             <tbody className="divide-y divide-gray-50">
               {campaignRows.map((r, i) => {
-                const ch = sourceToChannel(r.source, '');
-                const color = ch === 'linkedin' ? '#0077B5' : ch === 'meta' ? '#1877F2' : '#9ca3af';
+                const ch = sourceToChannel(r.source);
+                const color =
+                  ch === 'linkedin' ? '#0077B5' :
+                  ch === 'meta'     ? '#1877F2' :
+                  ch === 'google'   ? '#4285F4' : '#9ca3af';
+                const isUnset = r.campaign === '(not set)';
                 return (
                   <tr key={i} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-5 py-3 text-gray-800 font-medium max-w-xs truncate" title={r.campaign}>
-                      {r.campaign}
+                    <td className="px-5 py-3 font-medium max-w-xs truncate" title={r.campaign}
+                        style={{ color: isUnset ? '#8C9BAF' : '#12101F' }}>
+                      {isUnset ? '— geen UTM-campagne —' : r.campaign}
                     </td>
                     <td className="px-5 py-3">
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full text-white" style={{ background: color }}>
+                      <span className="text-xs font-bold px-2 py-0.5 text-white" style={{ background: color, borderRadius: '4px' }}>
                         {r.source}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-right font-semibold text-gray-900 tabular-nums">
+                    <td className="px-5 py-3 text-right font-semibold tabular-nums" style={{ color: '#12101F' }}>
                       {fmtNum(r.completions)}
                     </td>
                   </tr>

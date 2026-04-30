@@ -213,13 +213,16 @@ export async function getAnalyticsData(
     .filter((r) => r.completions > 0);
 
   // ── Parse Recruitee completions by UTM campaign ─────────────────────────────
+  // Keep (not set) campaigns — they represent real completions without UTM tags
+  // (common for LinkedIn where utm_campaign isn't always set). Filtering them out
+  // causes LinkedIn to disappear from the table entirely.
   const conversionsByCampaign: ConversionByCampaign[] = (campaignRes.data.rows ?? [])
     .map((row) => ({
       campaign:    row.dimensionValues?.[0]?.value ?? '(not set)',
       source:      row.dimensionValues?.[1]?.value ?? 'unknown',
       completions: Number(row.metricValues?.[0]?.value ?? 0),
     }))
-    .filter((r) => r.completions > 0 && r.campaign !== '(not set)');
+    .filter((r) => r.completions > 0);
 
   // ── Parse Google Ads campaigns ──────────────────────────────────────────────
   const adsCampaigns: GoogleAdsCampaignRow[] = (adsRes.data.rows ?? [])
