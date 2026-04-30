@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts';
-import type { AnalyticsDayRow, ConversionBySource, ConversionByCampaign, GoogleAdsCampaignRow, GoogleAdsDayRow } from '@/lib/analytics';
+import type { AnalyticsDayRow, ConversionBySource, ConversionByCampaign, ConversionByJob, GoogleAdsCampaignRow, GoogleAdsDayRow } from '@/lib/analytics';
 import GoogleAdsSection, { GoogleAdsSectionSkeleton } from '@/components/GoogleAdsSection';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -104,6 +104,7 @@ interface AnalyticsData {
   byDay:                 AnalyticsDayRow[];
   conversionsBySource:   ConversionBySource[];
   conversionsByCampaign: ConversionByCampaign[];
+  conversionsByJob:      ConversionByJob[];
   googleAds: {
     campaigns: GoogleAdsCampaignRow[];
     byDay:     GoogleAdsDayRow[];
@@ -177,6 +178,28 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
   const campaignRows = useMemo(() => {
     if (!data) return [];
     return data.conversionsByCampaign.slice(0, 15); // top 15
+  }, [data]);
+
+  // Completions by job title — pivoted by platform
+  const jobRows = useMemo(() => {
+    if (!data) return [];
+    const map = new Map<string, { linkedin: number; meta: number; google: number; other: number }>();
+    for (const r of data.conversionsByJob) {
+      const ch  = sourceToChannel(r.source);
+      const cur = map.get(r.jobTitle) ?? { linkedin: 0, meta: 0, google: 0, other: 0 };
+      cur[ch] += r.completions;
+      map.set(r.jobTitle, cur);
+    }
+    return Array.from(map.entries())
+      .map(([jobTitle, v]) => ({
+        jobTitle,
+        linkedin: v.linkedin,
+        meta:     v.meta,
+        google:   v.google,
+        other:    v.other,
+        total:    v.linkedin + v.meta + v.google + v.other,
+      }))
+      .sort((a, b) => b.total - a.total);
   }, [data]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -308,6 +331,53 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* ── Sollicitaties per vacature ── */}
+      {jobRows.length > 0 && (
+        <div className="bg-white overflow-hidden" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid #DCE0E6' }}>
+            <span className="gf-eyebrow">Sollicitaties per vacature</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead style={{ background: '#F0F4F8' }}>
+                <tr>
+                  <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#8C9BAF' }}>Vacature (paginatitel)</th>
+                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#0077B5' }}>LinkedIn</th>
+                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#1877F2' }}>Meta</th>
+                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#F59E0B' }}>Google</th>
+                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Overig</th>
+                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#12101F' }}>Totaal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jobRows.map((r, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid #F0F4F8' }} className="last:border-0 hover:bg-[#F0F4F8]/60 transition-colors">
+                    <td className="px-5 py-3 font-medium max-w-xs" title={r.jobTitle} style={{ color: '#12101F' }}>
+                      {r.jobTitle}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.linkedin > 0 ? '#0077B5' : '#BCC4CF', fontWeight: r.linkedin > 0 ? 600 : 400 }}>
+                      {r.linkedin > 0 ? fmtNum(r.linkedin) : '—'}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.meta > 0 ? '#1877F2' : '#BCC4CF', fontWeight: r.meta > 0 ? 600 : 400 }}>
+                      {r.meta > 0 ? fmtNum(r.meta) : '—'}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.google > 0 ? '#F59E0B' : '#BCC4CF', fontWeight: r.google > 0 ? 600 : 400 }}>
+                      {r.google > 0 ? fmtNum(r.google) : '—'}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.other > 0 ? '#555E6C' : '#BCC4CF', fontWeight: r.other > 0 ? 600 : 400 }}>
+                      {r.other > 0 ? fmtNum(r.other) : '—'}
+                    </td>
+                    <td className="px-5 py-3 text-right tabular-nums font-bold" style={{ color: '#12101F' }}>
+                      {fmtNum(r.total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

@@ -44,6 +44,12 @@ export interface ConversionByCampaign {
   completions: number;
 }
 
+export interface ConversionByJob {
+  jobTitle:    string;
+  source:      string;
+  completions: number;
+}
+
 export interface GoogleAdsCampaignRow {
   campaign:    string;
   network:     string; // Search, Display, YouTube, etc.
@@ -77,6 +83,7 @@ export interface AnalyticsSummary {
   byDay:                 AnalyticsDayRow[];
   conversionsBySource:   ConversionBySource[];
   conversionsByCampaign: ConversionByCampaign[];
+  conversionsByJob:      ConversionByJob[];
   googleAds: {
     campaigns: GoogleAdsCampaignRow[];
     byDay:     GoogleAdsDayRow[];
@@ -96,7 +103,7 @@ export async function getAnalyticsData(
   const property   = `properties/${propertyId}`;
   const dateRanges = [{ startDate, endDate }];
 
-  const [sessionRes, sourceRes, campaignRes, adsRes, adsDayRes] = await Promise.all([
+  const [sessionRes, sourceRes, campaignRes, adsRes, adsDayRes, jobRes] = await Promise.all([
 
     // 1. Sessions + key events by date × channel
     analytics.properties.runReport({
@@ -184,6 +191,20 @@ export async function getAnalyticsData(
         orderBys: [{ dimension: { dimensionName: 'date' }, desc: false }],
       },
     }).catch(() => ({ data: { rows: [] } })),
+
+    // 6. Recruitee completions by page title × session source (vacancy-level attribution)
+    analytics.properties.runReport({
+      property,
+      requestBody: {
+        dateRanges,
+        dimensions: [{ name: 'pageTitle' }, { name: 'sessionSource' }],
+        metrics:    [{ name: 'eventCount' }],
+        dimensionFilter: {
+          filter: { fieldName: 'eventName', stringFilter: { matchType: 'EXACT', value: CONVERSION_EVENT } },
+        },
+        orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
+      },
+    }).catch(() => ({ data: { rows: [] } })),
   ]);
 
   // ── Parse sessions by day ───────────────────────────────────────────────────
@@ -265,10 +286,20 @@ export async function getAnalyticsData(
       };
     });
 
+  // ── Parse completions by page title (vacancy) × source ─────────────────────
+  const conversionsByJob: ConversionByJob[] = (jobRes.data.rows ?? [])
+    .map((row) => ({
+      jobTitle:    row.dimensionValues?.[0]?.value ?? '(unknown)',
+      source:      row.dimensionValues?.[1]?.value ?? 'unknown',
+      completions: Number(row.metricValues?.[0]?.value ?? 0),
+    }))
+    .filter((r) => r.completions > 0 && r.jobTitle !== '(not set)');
+
   return {
     byDay,
     conversionsBySource,
     conversionsByCampaign,
+    conversionsByJob,
     googleAds: { campaigns: adsCampaigns, byDay: adsByDay },
   };
 }
