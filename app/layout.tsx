@@ -1,20 +1,24 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Epilogue, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const epilogue = Epilogue({
+  variable: "--font-epilogue",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
   subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Marketing Dashboard — LinkedIn & Meta",
-  description: "Combined LinkedIn Ads and Meta Ads campaign dashboard",
+  title: "Recruitment Dashboard — Teylingereind",
+  description: "Recruitment marketing dashboard voor LinkedIn, Meta en Google Ads",
 };
 
 export default function RootLayout({
@@ -23,11 +27,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="nl" className={`${epilogue.variable} ${jetbrainsMono.variable} h-full`}>
+      <body className="min-h-full flex flex-col antialiased">{children}</body>
     </html>
   );
 }

@@ -35,11 +35,11 @@ const PLATFORM_LABEL: Record<Platform, string> = {
 
 export function CampaignRankTableSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden animate-pulse">
-      <div className="px-5 py-4 border-b border-gray-100">
-        <div className="h-3 bg-gray-200 rounded w-1/4" />
+    <div className="bg-white overflow-hidden animate-pulse" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
+      <div className="px-5 py-4" style={{ borderBottom: '1px solid #DCE0E6' }}>
+        <div className="h-2.5 bg-gray-200 rounded w-1/4" />
       </div>
-      <div className="divide-y divide-gray-50">
+      <div className="divide-y" style={{ borderColor: '#F0F4F8' }}>
         {Array.from({ length: 5 }).map((_, i) => (
           <div key={i} className="px-5 py-4 flex gap-4 items-center">
             <div className="h-4 bg-gray-100 rounded w-6" />
@@ -86,94 +86,99 @@ export default function CampaignRankTable({ rows }: Props) {
 
   if (campaigns.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 text-center text-gray-400 text-sm">
+      <div className="bg-white p-8 text-center text-sm" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', color: '#8C9BAF' }}>
         Geen campagnedata beschikbaar
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-100">
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400">
-          Campagne ranking — gesorteerd op kosten per sollicitant
-        </h2>
+    <div className="bg-white overflow-hidden" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
+      <div className="px-5 py-4" style={{ borderBottom: '1px solid #DCE0E6' }}>
+        <span className="gf-eyebrow">Campagne ranking — gesorteerd op kosten per sollicitant</span>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50">
+          <thead style={{ background: '#F0F4F8' }}>
             <tr>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 w-10">#</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Campagne</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Platform</th>
-              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Budget</th>
-              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Clicks</th>
-              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Kosten/klik</th>
-              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Sollicitanten</th>
-              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Kosten/soll.</th>
-              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 w-36">Budgetaandeel</th>
+              <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider w-10" style={{ color: '#8C9BAF' }}>#</th>
+              <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#8C9BAF' }}>Campagne</th>
+              <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Platform</th>
+              <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Budget</th>
+              <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Clicks</th>
+              <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Kosten/klik</th>
+              <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Sollicitanten</th>
+              <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Kosten/soll.</th>
+              <th className="px-5 py-3 text-left text-xs font-bold uppercase tracking-wider w-36" style={{ color: '#8C9BAF' }}>Budgetaandeel</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50">
+          <tbody>
             {campaigns.map((c) => {
               const color = PLATFORM_COLOR[c.platform];
               const isTop = c.rank === 1 && c.cpa !== Infinity;
               return (
-                <tr key={`${c.platform}-${c.campaign_name}`} className={`hover:bg-gray-50 transition-colors ${isTop ? 'bg-green-50/40' : ''}`}>
+                <tr
+                  key={`${c.platform}-${c.campaign_name}`}
+                  style={{
+                    borderBottom: '1px solid #F0F4F8',
+                    background: isTop ? 'rgba(99,49,244,0.03)' : undefined,
+                  }}
+                  className="transition-colors hover:bg-[#F0F4F8]/60"
+                >
                   {/* Rank */}
-                  <td className="px-5 py-3.5 text-xs font-bold text-gray-300">{c.rank}</td>
+                  <td className="px-5 py-3.5 text-xs font-bold tabular-nums" style={{ color: '#BCC4CF' }}>{c.rank}</td>
 
                   {/* Campaign name */}
-                  <td className="px-5 py-3.5 text-gray-800 font-medium max-w-xs truncate" title={c.campaign_name}>
+                  <td className="px-5 py-3.5 font-medium max-w-xs truncate" title={c.campaign_name} style={{ color: '#12101F' }}>
                     {c.campaign_name}
                   </td>
 
                   {/* Platform badge */}
                   <td className="px-5 py-3.5">
                     <span
-                      className="inline-block px-2.5 py-0.5 rounded-full text-white text-xs font-semibold whitespace-nowrap"
-                      style={{ background: color }}
+                      className="inline-block px-2 py-0.5 text-white text-xs font-bold whitespace-nowrap"
+                      style={{ background: color, borderRadius: '4px' }}
                     >
                       {PLATFORM_LABEL[c.platform]}
                     </span>
                   </td>
 
                   {/* Spend */}
-                  <td className="px-5 py-3.5 text-right text-gray-700 tabular-nums whitespace-nowrap">
+                  <td className="px-5 py-3.5 text-right tabular-nums whitespace-nowrap" style={{ color: '#555E6C' }}>
                     {fmtEur(c.spend)}
                   </td>
 
                   {/* Clicks */}
-                  <td className="px-5 py-3.5 text-right text-gray-700 tabular-nums">
+                  <td className="px-5 py-3.5 text-right tabular-nums" style={{ color: '#555E6C' }}>
                     {fmtNum(c.clicks)}
                   </td>
 
                   {/* CPC */}
-                  <td className="px-5 py-3.5 text-right text-gray-700 tabular-nums whitespace-nowrap">
+                  <td className="px-5 py-3.5 text-right tabular-nums whitespace-nowrap" style={{ color: '#555E6C' }}>
                     {c.cpc !== Infinity ? fmtEur(c.cpc) : '—'}
                   </td>
 
                   {/* Applicants */}
-                  <td className="px-5 py-3.5 text-right text-gray-700 tabular-nums">
+                  <td className="px-5 py-3.5 text-right tabular-nums" style={{ color: '#555E6C' }}>
                     {fmtNum(c.applicants)}
                   </td>
 
                   {/* CPA */}
-                  <td className={`px-5 py-3.5 text-right tabular-nums font-semibold whitespace-nowrap ${isTop ? 'text-green-700' : 'text-gray-900'}`}>
+                  <td className="px-5 py-3.5 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: isTop ? '#6331F4' : '#12101F' }}>
                     {c.cpa !== Infinity ? fmtEur(c.cpa) : '—'}
                   </td>
 
                   {/* Budget share bar */}
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-100 rounded-full h-1.5 min-w-[60px]">
+                      <div className="flex-1 h-1.5 min-w-[60px]" style={{ background: '#F0F4F8', borderRadius: '99px' }}>
                         <div
-                          className="h-1.5 rounded-full"
-                          style={{ width: `${(c.budgetShare * 100).toFixed(1)}%`, background: color }}
+                          className="h-1.5"
+                          style={{ width: `${(c.budgetShare * 100).toFixed(1)}%`, background: color, borderRadius: '99px' }}
                         />
                       </div>
-                      <span className="text-xs text-gray-400 w-8 text-right tabular-nums">
+                      <span className="text-xs w-8 text-right tabular-nums" style={{ color: '#8C9BAF' }}>
                         {(c.budgetShare * 100).toFixed(0)}%
                       </span>
                     </div>

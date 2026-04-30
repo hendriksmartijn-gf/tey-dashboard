@@ -39,23 +39,23 @@ interface SpotlightCardProps {
 
 function SpotlightCard({ badge, badgeColor, title, campaignName, platform, metric, metricLabel }: SpotlightCardProps) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+    <div className="bg-white p-5" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
       <div className="flex items-center gap-2 mb-3">
         <span className="text-base">{badge}</span>
-        <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: badgeColor }}>{title}</span>
+        <span className="text-xs font-bold uppercase tracking-widest" style={{ color: badgeColor }}>{title}</span>
       </div>
-      <p className="text-base font-bold text-gray-900 leading-snug mb-2 truncate" title={campaignName}>
+      <p className="text-base font-semibold leading-snug mb-3 truncate" title={campaignName} style={{ color: '#12101F' }}>
         {campaignName}
       </p>
       <div className="flex items-center justify-between">
         <span
-          className="text-xs font-semibold px-2 py-0.5 rounded-full text-white"
-          style={{ background: PLATFORM_COLOR[platform] }}
+          className="text-xs font-bold px-2 py-0.5 text-white"
+          style={{ background: PLATFORM_COLOR[platform], borderRadius: '4px' }}
         >
           {PLATFORM_LABEL[platform]}
         </span>
-        <span className="text-xs text-gray-400">
-          {metricLabel}: <span className="font-semibold text-gray-700">{metric}</span>
+        <span className="text-xs" style={{ color: '#8C9BAF' }}>
+          {metricLabel}: <span className="font-bold" style={{ color: '#12101F' }}>{metric}</span>
         </span>
       </div>
     </div>
@@ -163,21 +163,35 @@ export default function DashboardPage() {
   );
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen" style={{ background: '#F0F4F8' }}>
 
       {/* ── Header ── */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <header className="sticky top-0 z-10" style={{ background: '#12101F' }}>
         <div className="max-w-[1280px] mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-bold text-gray-900 tracking-tight">Recruitment Dashboard</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 font-medium">
-              LinkedIn · Meta
+          <div className="flex items-center gap-4">
+            {/* Goldfizh purple square mark */}
+            <span
+              className="w-6 h-6 rounded-sm flex-shrink-0"
+              style={{ background: '#6331F4' }}
+              aria-hidden="true"
+            />
+            <span className="text-sm font-bold text-white tracking-tight">
+              Teylingereind
+            </span>
+            <span
+              className="text-xs px-2.5 py-0.5 font-semibold"
+              style={{ background: 'rgba(99,49,244,0.25)', color: '#A38DFB', borderRadius: '4px' }}
+            >
+              LinkedIn · Meta · Google Ads
             </span>
           </div>
           <button
             onClick={fetchData}
             disabled={loading}
-            className="text-xs font-semibold text-gray-400 hover:text-gray-900 disabled:opacity-40 transition-colors"
+            className="text-xs font-semibold disabled:opacity-40 transition-colors"
+            style={{ color: '#8C9BAF' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = '#ffffff')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = '#8C9BAF')}
           >
             {loading ? 'Laden…' : 'Vernieuwen'}
           </button>
@@ -185,28 +199,30 @@ export default function DashboardPage() {
       </header>
 
       {/* ── Date filter ── */}
-      <div className="bg-white border-b border-gray-100 sticky top-14 z-10">
+      <div className="sticky top-14 z-10" style={{ background: '#ffffff', borderBottom: '1px solid #DCE0E6' }}>
         <div className="max-w-[1280px] mx-auto px-6 h-12 flex items-center gap-4">
-          <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Periode</span>
+          <span className="gf-eyebrow">Periode</span>
           <div className="flex items-center gap-2">
             <input
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              className="text-xs px-2.5 py-1.5 text-[#12101F] focus:outline-none focus:ring-2 focus:ring-[#6331F4]"
+              style={{ border: '1px solid #DCE0E6', borderRadius: '4px' }}
             />
-            <span className="text-xs text-gray-400">t/m</span>
+            <span className="text-xs text-[#8C9BAF]">t/m</span>
             <input
               type="date"
               value={dateTo}
               onChange={(e) => setDateTo(e.target.value)}
-              className="text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-300"
+              className="text-xs px-2.5 py-1.5 text-[#12101F] focus:outline-none focus:ring-2 focus:ring-[#6331F4]"
+              style={{ border: '1px solid #DCE0E6', borderRadius: '4px' }}
             />
           </div>
           {(dateFrom || dateTo) && (
             <button
               onClick={() => { setDateFrom(''); setDateTo(''); }}
-              className="text-xs text-gray-400 hover:text-gray-700 transition-colors"
+              className="text-xs text-[#8C9BAF] hover:text-[#6331F4] transition-colors"
             >
               Wis filter
             </button>
@@ -214,11 +230,11 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="max-w-[1280px] mx-auto px-6 py-8 space-y-8">
+      <div className="max-w-[1280px] mx-auto px-6 py-8 space-y-10">
 
         {/* ── Error ── */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
             <span className="text-red-500 text-lg leading-none">⚠</span>
             <div>
               <p className="text-sm font-semibold text-red-700">Fout bij laden</p>
@@ -232,20 +248,21 @@ export default function DashboardPage() {
 
         {/* ── Top KPIs ── */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Totaaloverzicht</h2>
+          <h2 className="gf-eyebrow mb-5">Totaaloverzicht</h2>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => <KpiCardSkeleton key={i} />)
             ) : (
               <>
-                <KpiCard title="Budget gespendeerd"   value={fmtEur(totals.spend)}                                    subtitle="LinkedIn + Meta" />
-                <KpiCard title="Totaal sollicitanten" value={fmtNum(totals.conversions)}                               subtitle="Alle kanalen" />
-                <KpiCard title="Kosten per sollicitant" value={overallCpa !== null ? fmtEur(overallCpa) : '—'}         subtitle="Spend ÷ sollicitanten" />
+                <KpiCard title="Budget gespendeerd"     value={fmtEur(totals.spend)}                                    subtitle="Alle kanalen" />
+                <KpiCard title="Totaal sollicitanten"   value={fmtNum(totals.conversions)}                               subtitle="LinkedIn · Meta · Google Ads" />
+                <KpiCard title="Kosten per sollicitant" value={overallCpa !== null ? fmtEur(overallCpa) : '—'}           subtitle="Spend ÷ sollicitanten" />
                 <KpiCard
                   title="Beste kanaal"
                   value={bestChannel}
+                  accent={bestChannel !== '—'}
                   subtitle={
-                    bestChannel !== '—'
+                    bestChannel !== '—' && isFinite(minCpa)
                       ? `Laagste CPA: ${fmtEur(minCpa)}`
                       : 'Geen conversiedata'
                   }
@@ -257,7 +274,7 @@ export default function DashboardPage() {
 
         {/* ── Channel comparison ── */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Kanaalvergelijking</h2>
+          <h2 className="gf-eyebrow mb-5">Kanaalvergelijking</h2>
 
           {/* Channel cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -274,14 +291,14 @@ export default function DashboardPage() {
 
           {/* Metric-by-metric comparison table */}
           {!loading && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-white overflow-hidden" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-100">
+                <thead style={{ background: '#F0F4F8', borderBottom: '1px solid #DCE0E6' }}>
                   <tr>
-                    <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 w-36">Metric</th>
-                    <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-[#0077B5]">LinkedIn</th>
-                    <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-[#1877F2]">Meta</th>
-                    <th className="py-3 px-4 text-left text-xs font-semibold uppercase tracking-wider text-[#4285F4]">Google Ads</th>
+                    <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider w-36" style={{ color: '#8C9BAF' }}>Metric</th>
+                    <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#0077B5' }}>LinkedIn</th>
+                    <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#1877F2' }}>Meta</th>
+                    <th className="py-3 px-4 text-left text-xs font-bold uppercase tracking-wider" style={{ color: '#4285F4' }}>Google Ads</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -299,11 +316,11 @@ export default function DashboardPage() {
                       : Math.max(liR, meR, goR);
                     const win = (v: number) => !neutral && v === best && v > 0;
                     return (
-                      <tr key={label} className="border-b border-gray-50 last:border-0">
-                        <td className="py-3 px-4 text-xs text-gray-500 font-medium">{label}</td>
+                      <tr key={label} style={{ borderBottom: '1px solid #F0F4F8' }} className="last:border-0">
+                        <td className="py-3 px-4 text-xs font-medium" style={{ color: '#555E6C' }}>{label}</td>
                         {([['LinkedIn', li, liR], ['Meta', me, meR], ['Google', go, goR]] as [string, string, number][]).map(([, val, raw]) => (
-                          <td key={val} className={`py-3 px-4 text-sm tabular-nums font-semibold ${win(raw) ? 'text-green-700' : 'text-gray-800'}`}>
-                            {win(raw) && <span className="mr-1 text-green-500">✓</span>}
+                          <td key={val} className="py-3 px-4 text-sm tabular-nums font-semibold" style={{ color: win(raw) ? '#6331F4' : '#12101F' }}>
+                            {win(raw) && <span className="mr-1" style={{ color: '#6331F4' }}>✓</span>}
                             {val}
                           </td>
                         ))}
@@ -318,13 +335,13 @@ export default function DashboardPage() {
 
         {/* ── CPA trend ── */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Trend</h2>
+          <h2 className="gf-eyebrow mb-5">Trend</h2>
           {loading ? <CpaTrendChartSkeleton /> : <CpaTrendChart rows={filtered} />}
         </section>
 
         {/* ── Campaign spotlight ── */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Uitschieters</h2>
+          <h2 className="gf-eyebrow mb-5">Uitschieters</h2>
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <KpiCardSkeleton /><KpiCardSkeleton />
@@ -334,7 +351,7 @@ export default function DashboardPage() {
               {bestCpaCampaign ? (
                 <SpotlightCard
                   badge="🏆"
-                  badgeColor="#16a34a"
+                  badgeColor="#6331F4"
                   title="Beste campagne"
                   campaignName={bestCpaCampaign.campaign_name}
                   platform={bestCpaCampaign.platform}
@@ -342,14 +359,14 @@ export default function DashboardPage() {
                   metricLabel="CPA"
                 />
               ) : (
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 text-sm text-gray-400">
+                <div className="bg-white rounded-lg p-5 text-sm text-[#8C9BAF]" style={{ border: '1px solid #DCE0E6' }}>
                   Geen conversiedata beschikbaar
                 </div>
               )}
               {bestCpcCampaign ? (
                 <SpotlightCard
                   badge="🖱️"
-                  badgeColor="#2563eb"
+                  badgeColor="#6331F4"
                   title="Meest geklikt per €"
                   campaignName={bestCpcCampaign.campaign_name}
                   platform={bestCpcCampaign.platform}
@@ -357,7 +374,7 @@ export default function DashboardPage() {
                   metricLabel="CPC"
                 />
               ) : (
-                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 text-sm text-gray-400">
+                <div className="bg-white rounded-lg p-5 text-sm text-[#8C9BAF]" style={{ border: '1px solid #DCE0E6' }}>
                   Geen klikdata beschikbaar
                 </div>
               )}
@@ -367,13 +384,13 @@ export default function DashboardPage() {
 
         {/* ── Campaign rankings ── */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Campagnes</h2>
+          <h2 className="gf-eyebrow mb-5">Campagnes</h2>
           {loading ? <CampaignRankTableSkeleton /> : <CampaignRankTable rows={filtered} />}
         </section>
 
         {/* ── Google Analytics ── */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Website — Google Analytics</h2>
+          <h2 className="gf-eyebrow mb-5">Website — Google Analytics</h2>
           <AnalyticsSection dateFrom={dateFrom} dateTo={dateTo} liSpend={liTotals.spend} meSpend={meTotals.spend} />
         </section>
 

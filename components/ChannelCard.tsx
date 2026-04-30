@@ -22,14 +22,14 @@ const CONFIG = {
 
 export function ChannelCardSkeleton() {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 animate-pulse">
-      <div className="h-3 bg-gray-200 rounded w-1/3 mb-5" />
+    <div className="bg-white rounded-lg border border-[#DCE0E6] p-6 animate-pulse" style={{ boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
+      <div className="h-2.5 bg-gray-200 rounded w-1/3 mb-5" />
       <div className="h-10 bg-gray-200 rounded w-1/2 mb-6" />
       <div className="grid grid-cols-2 gap-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i}>
-            <div className="h-2.5 bg-gray-100 rounded w-1/2 mb-1.5" />
-            <div className="h-5 bg-gray-200 rounded w-3/4" />
+            <div className="h-2 bg-gray-100 rounded w-1/2 mb-1.5" />
+            <div className="h-4 bg-gray-200 rounded w-3/4" />
           </div>
         ))}
       </div>
@@ -44,9 +44,20 @@ export default function ChannelCard({ platform, spend, applicants, clicks, impre
   const cpc = clicks > 0 ? spend / clicks : 0;
 
   return (
-    <div className={`bg-white rounded-xl border shadow-sm p-6 relative ${isWinner ? 'border-green-300' : 'border-gray-100'}`}>
+    <div
+      className="bg-white rounded-lg p-6 relative"
+      style={{
+        border: `1px solid ${isWinner ? '#6331F4' : '#DCE0E6'}`,
+        boxShadow: isWinner
+          ? '0 8px 24px rgba(18,16,34,0.08), 0 0 0 1px #6331F4'
+          : '0 8px 24px rgba(18,16,34,0.08)',
+      }}
+    >
       {isWinner && (
-        <span className="absolute top-4 right-4 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+        <span
+          className="absolute top-4 right-4 text-xs font-bold px-2 py-0.5 rounded"
+          style={{ background: '#E2DBFF', color: '#6331F4' }}
+        >
           Beste CPA
         </span>
       )}
@@ -58,29 +69,29 @@ export default function ChannelCard({ platform, spend, applicants, clicks, impre
 
       {/* CPA — hero metric */}
       <div className="mb-6">
-        <p className="text-xs text-gray-400 uppercase tracking-widest mb-1">Kosten per sollicitant</p>
-        <p className="text-4xl font-bold text-gray-900 tabular-nums">
+        <p className="text-xs text-[#8C9BAF] uppercase tracking-widest mb-1">Kosten per sollicitant</p>
+        <p className="gf-display text-4xl font-light text-[#12101F] tabular-nums">
           {cpa !== null ? fmtEur2(cpa) : '—'}
         </p>
       </div>
 
       {/* Supporting metrics */}
-      <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t border-gray-100">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t border-[#DCE0E6]">
         <div>
-          <p className="text-xs text-gray-400 mb-0.5">Budget gespendeerd</p>
-          <p className="text-sm font-semibold text-gray-800">{fmtEur(spend)}</p>
+          <p className="text-xs text-[#8C9BAF] mb-0.5">Budget gespendeerd</p>
+          <p className="text-sm font-semibold text-[#12101F]">{fmtEur(spend)}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-400 mb-0.5">Sollicitanten</p>
-          <p className="text-sm font-semibold text-gray-800">{fmtNum(applicants)}</p>
+          <p className="text-xs text-[#8C9BAF] mb-0.5">Sollicitanten</p>
+          <p className="text-sm font-semibold text-[#12101F]">{fmtNum(applicants)}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-400 mb-0.5">CTR</p>
-          <p className="text-sm font-semibold text-gray-800">{fmtPct(ctr)}</p>
+          <p className="text-xs text-[#8C9BAF] mb-0.5">CTR</p>
+          <p className="text-sm font-semibold text-[#12101F]">{fmtPct(ctr)}</p>
         </div>
         <div>
-          <p className="text-xs text-gray-400 mb-0.5">Kosten per klik</p>
-          <p className="text-sm font-semibold text-gray-800">{cpc > 0 ? fmtEur2(cpc) : '—'}</p>
+          <p className="text-xs text-[#8C9BAF] mb-0.5">Kosten per klik</p>
+          <p className="text-sm font-semibold text-[#12101F]">{cpc > 0 ? fmtEur2(cpc) : '—'}</p>
         </div>
       </div>
     </div>
