@@ -8,7 +8,9 @@ interface CampaignSummary {
   campaign_name: string;
   spend: number;
   applicants: number;
+  clicks: number;
   cpa: number;
+  cpc: number;
   budgetShare: number; // 0-1
 }
 
@@ -70,9 +72,11 @@ export default function CampaignRankTable({ rows }: Props) {
       rank: 0,
       platform: v.platform,
       campaign_name: key.split('::')[1],
-      spend: v.spend,
-      applicants: v.applicants,
-      cpa: v.applicants > 0 ? v.spend / v.applicants : Infinity,
+      spend:       v.spend,
+      applicants:  v.applicants,
+      clicks:      v.clicks,
+      cpa:         v.applicants > 0 ? v.spend / v.applicants : Infinity,
+      cpc:         v.clicks     > 0 ? v.spend / v.clicks     : Infinity,
       budgetShare: totalSpend > 0 ? v.spend / totalSpend : 0,
     }))
     .sort((a, b) => a.cpa - b.cpa)
@@ -102,6 +106,8 @@ export default function CampaignRankTable({ rows }: Props) {
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Campagne</th>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Platform</th>
               <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Budget</th>
+              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Clicks</th>
+              <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Kosten/klik</th>
               <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Sollicitanten</th>
               <th className="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-400 whitespace-nowrap">Kosten/soll.</th>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400 w-36">Budgetaandeel</th>
@@ -134,6 +140,16 @@ export default function CampaignRankTable({ rows }: Props) {
                   {/* Spend */}
                   <td className="px-5 py-3.5 text-right text-gray-700 tabular-nums whitespace-nowrap">
                     {fmtEur(c.spend)}
+                  </td>
+
+                  {/* Clicks */}
+                  <td className="px-5 py-3.5 text-right text-gray-700 tabular-nums">
+                    {fmtNum(c.clicks)}
+                  </td>
+
+                  {/* CPC */}
+                  <td className="px-5 py-3.5 text-right text-gray-700 tabular-nums whitespace-nowrap">
+                    {c.cpc !== Infinity ? fmtEur(c.cpc) : '—'}
                   </td>
 
                   {/* Applicants */}
