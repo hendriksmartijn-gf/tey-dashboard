@@ -8,7 +8,7 @@ import CpaTrendChart, { CpaTrendChartSkeleton } from '@/components/CpaTrendChart
 import AnalyticsSection from '@/components/AnalyticsSection';
 import SollicitatiesSection from '@/components/SollicitatiesSection';
 import GoogleAdsWrapper from '@/components/GoogleAdsWrapper';
-import CampaignSelector from '@/components/CampaignSelector';
+import PlatformCampaignDropdown from '@/components/PlatformCampaignDropdown';
 import type { CampaignRow, Platform } from '@/types/campaign';
 import { sumRows } from '@/types/campaign';
 
@@ -215,6 +215,20 @@ export default function DashboardPage() {
     [campaignSummaries],
   );
 
+  // Per-platform campaign lists for the control-bar dropdowns
+  const liCampaigns = useMemo(() =>
+    [...new Set(rows.filter((r) => r.platform === 'linkedin').map((r) => r.campaign_name))].sort(),
+    [rows],
+  );
+  const meCampaigns = useMemo(() =>
+    [...new Set(rows.filter((r) => r.platform === 'meta').map((r) => r.campaign_name))].sort(),
+    [rows],
+  );
+  const goCampaigns = useMemo(() =>
+    [...new Set(rows.filter((r) => r.platform === 'google').map((r) => r.campaign_name))].sort(),
+    [rows],
+  );
+
   // ── Preset button helper ───────────────────────────────────────────────────
   const presets: { key: Preset; label: string }[] = [
     { key: 'week',    label: 'Deze week' },
@@ -250,39 +264,39 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* ── Control bar: tabs + period ──────────────────────────────── */}
+      {/* ── Control bar ─────────────────────────────────────────────── */}
       <div className="sticky top-14 z-10 bg-white" style={{ borderBottom: '1px solid #DCE0E6' }}>
         <div className="max-w-[1280px] mx-auto px-6">
 
-          {/* Row 1: tabs — pill segment control */}
-          <div className="flex items-center gap-2 pt-3 pb-3">
+          {/* Row 1: centered nav */}
+          <nav className="flex items-center justify-center" style={{ borderBottom: '1px solid #F0F4F8' }}>
             {([
-              { key: 'ads' as Tab,            label: 'Advertenties' },
-              { key: 'sollicitaties' as Tab,  label: 'Sollicitaties' },
-              { key: 'ga4' as Tab,            label: 'GA4 — Website' },
+              { key: 'ads' as Tab,           label: 'Advertenties' },
+              { key: 'sollicitaties' as Tab, label: 'Sollicitaties' },
+              { key: 'ga4' as Tab,           label: 'GA4 — Website' },
             ] as { key: Tab; label: string }[]).map(({ key, label }) => {
               const active = tab === key;
               return (
                 <button
                   key={key}
                   onClick={() => setTab(key)}
-                  className="px-5 py-2 text-sm font-bold transition-all"
-                  style={{
-                    borderRadius: '6px',
-                    background: active ? '#12101F' : 'transparent',
-                    color:      active ? '#ffffff'  : '#8C9BAF',
-                    border:     `1.5px solid ${active ? '#12101F' : '#DCE0E6'}`,
-                    letterSpacing: '-0.01em',
-                  }}
+                  className="relative px-6 py-4 text-sm font-semibold transition-colors"
+                  style={{ color: active ? '#12101F' : '#8C9BAF', letterSpacing: '-0.01em' }}
                 >
                   {label}
+                  {active && (
+                    <span
+                      className="absolute bottom-0 left-4 right-4"
+                      style={{ height: '2px', background: '#6331F4', borderRadius: '2px 2px 0 0' }}
+                    />
+                  )}
                 </button>
               );
             })}
-          </div>
+          </nav>
 
           {/* Row 2: period presets */}
-          <div className="flex flex-wrap items-center gap-2 pb-3">
+          <div className="flex flex-wrap items-center gap-2 py-3">
             <span className="gf-eyebrow mr-1 hidden sm:inline-flex">Periode</span>
             <div className="flex items-center gap-1.5 flex-wrap">
               {presets.map(({ key, label }) => {
@@ -304,7 +318,6 @@ export default function DashboardPage() {
                 );
               })}
 
-              {/* Custom date inputs — only visible when preset === 'custom' */}
               {preset === 'custom' && (
                 <div className="flex items-center gap-1.5 ml-1">
                   <input
@@ -326,7 +339,6 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {/* Date range display for non-custom presets */}
             {preset !== 'custom' && dateFrom && (
               <span className="text-xs ml-2" style={{ color: '#BCC4CF' }}>
                 {new Date(dateFrom).toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
@@ -335,6 +347,16 @@ export default function DashboardPage() {
               </span>
             )}
           </div>
+
+          {/* Row 3: per-platform campaign filters (Ads tab only) */}
+          {tab === 'ads' && !loading && (liCampaigns.length > 0 || meCampaigns.length > 0 || goCampaigns.length > 0) && (
+            <div className="flex items-center gap-2 pb-3">
+              <span className="gf-eyebrow mr-1 hidden sm:inline-flex">Campagnes</span>
+              <PlatformCampaignDropdown platform="linkedin" campaigns={liCampaigns} selected={selectedCampaigns} onChange={setSelectedCampaigns} />
+              <PlatformCampaignDropdown platform="meta"     campaigns={meCampaigns} selected={selectedCampaigns} onChange={setSelectedCampaigns} />
+              <PlatformCampaignDropdown platform="google"   campaigns={goCampaigns} selected={selectedCampaigns} onChange={setSelectedCampaigns} />
+            </div>
+          )}
 
         </div>
       </div>
@@ -360,18 +382,8 @@ export default function DashboardPage() {
         {/* TAB: ADVERTENTIES                                          */}
         {/* ══════════════════════════════════════════════════════════ */}
         {tab === 'ads' && (
-          <div className="flex gap-6 items-start">
-
-            {/* ── Sidebar: campaign selector ─────────────────────── */}
-            <div className="w-60 flex-shrink-0 sticky" style={{ top: '9.5rem' }}>
-              {loading
-                ? <div className="bg-white animate-pulse rounded-lg" style={{ border: '1px solid #DCE0E6', height: '320px' }} />
-                : <CampaignSelector rows={filtered} selected={selectedCampaigns} onChange={setSelectedCampaigns} />
-              }
-            </div>
-
-            {/* ── Main content ───────────────────────────────────── */}
-            <div className="flex-1 min-w-0 space-y-10">
+          <>
+            <div className="space-y-10">
 
               {/* Top KPIs */}
               <section>
@@ -509,8 +521,8 @@ export default function DashboardPage() {
                 <GoogleAdsWrapper dateFrom={dateFrom} dateTo={dateTo} />
               </section>
 
-            </div>{/* end main */}
-          </div>
+            </div>
+          </>
         )}
 
         {/* ══════════════════════════════════════════════════════════ */}
