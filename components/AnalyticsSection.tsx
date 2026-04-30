@@ -14,6 +14,12 @@ const fmtNum = (n: number) => n.toLocaleString('nl-NL');
 const fmtEur = (n: number) =>
   n.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 });
 
+// Strip the site-name prefix GA4 appends to every page title
+const TITLE_PREFIX = 'Forensisch centrum Teylingereind - ';
+function shortTitle(raw: string): string {
+  return raw.startsWith(TITLE_PREFIX) ? raw.slice(TITLE_PREFIX.length) : raw;
+}
+
 function sourceToChannel(source: string): 'linkedin' | 'meta' | 'google' | 'other' {
   const s = source.toLowerCase();
   if (s.includes('linkedin') || s.includes('lnkd'))                                    return 'linkedin';
@@ -355,8 +361,8 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
               <tbody>
                 {jobRows.map((r, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #F0F4F8' }} className="last:border-0 hover:bg-[#F0F4F8]/60 transition-colors">
-                    <td className="px-5 py-3 font-medium max-w-xs" title={r.jobTitle} style={{ color: '#12101F' }}>
-                      {r.jobTitle}
+                    <td className="px-5 py-3 font-medium" title={r.jobTitle} style={{ color: '#12101F', maxWidth: '420px' }}>
+                      {shortTitle(r.jobTitle)}
                     </td>
                     <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.linkedin > 0 ? '#0077B5' : '#BCC4CF', fontWeight: r.linkedin > 0 ? 600 : 400 }}>
                       {r.linkedin > 0 ? fmtNum(r.linkedin) : '—'}
