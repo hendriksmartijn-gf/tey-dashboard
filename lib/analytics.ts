@@ -1,6 +1,8 @@
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
 
+const CONVERSION_EVENT = 'Sollicitatie_voltooid_recruitee';
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 function getAnalyticsClient() {
@@ -23,15 +25,29 @@ function getAnalyticsClient() {
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface AnalyticsDayRow {
-  date: string;            // YYYY-MM-DD
-  channel: string;         // e.g. 'Paid Social', 'Organic Search', 'Direct'
+  date: string;
+  channel: string;
   sessions: number;
   users: number;
-  keyEvents: number;       // goal completions / conversions
+  keyEvents: number;
+}
+
+export interface ConversionBySource {
+  source: string;   // e.g. 'linkedin.com', 'facebook'
+  medium: string;   // e.g. 'cpc', 'paid-social'
+  completions: number;
+}
+
+export interface ConversionByCampaign {
+  campaign: string; // utm_campaign value
+  source: string;
+  completions: number;
 }
 
 export interface AnalyticsSummary {
   byDay: AnalyticsDayRow[];
+  conversionsBySource: ConversionBySource[];
+  conversionsByCampaign: ConversionByCampaign[];
 }
 
 // ── Fetch ─────────────────────────────────────────────────────────────────────
@@ -43,37 +59,67 @@ export async function getAnalyticsData(
   const propertyId = process.env.GA4_PROPERTY_ID;
   if (!propertyId) throw new Error('Missing GA4_PROPERTY_ID env var');
 
-  const analytics = getAnalyticsClient();
+  const analytics  = getAnalyticsClient();
+  const property   = `properties/${propertyId}`;
+  const dateRanges = [{ startDate, endDate }];
 
-  const res = await analytics.properties.runReport({
-    property: `properties/${propertyId}`,
-    requestBody: {
-      dateRanges: [{ startDate, endDate }],
-      dimensions: [
-        { name: 'date' },
-        { name: 'sessionDefaultChannelGrouping' },
-      ],
-      metrics: [
-        { name: 'sessions' },
-        { name: 'activeUsers' },
-        { name: 'keyEvents' },
-      ],
-      orderBys: [{ dimension: { dimensionName: 'date' }, desc: false }],
-    },
-  });
+  // Run all 3 queries in parallel
+  const [sessionRes, sourceRes, campaignRes] = await Promise.all([
 
-  const rows = res.data.rows ?? [];
+    // 1. Sessions + key events by date × channel (existing)
+    analytics.properties.runReport({
+      property,
+      requestBody: {
+        dateRanges,
+        dimensions: [{ name: 'date' }, { name: 'sessionDefaultChannelGrouping' }],
+        metrics:    [{ name: 'sessions' }, { name: 'activeUsers' }, { name: 'keyEvents' }],
+        orderBys:   [{ dimension: { dimensionName: 'date' }, desc: false }],
+      },
+    }),
 
-  const byDay: AnalyticsDayRow[] = rows.map((row) => {
+    // 2. Sollicitatie_voltooid_recruitee by source + medium
+    analytics.properties.runReport({
+      property,
+      requestBody: {
+        dateRanges,
+        dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
+        metrics:    [{ name: 'eventCount' }],
+        dimensionFilter: {
+          filter: {
+            fieldName:    'eventName',
+            stringFilter: { matchType: 'EXACT', value: CONVERSION_EVENT },
+          },
+        },
+        orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
+      },
+    }),
+
+    // 3. Sollicitatie_voltooid_recruitee by campaign + source
+    analytics.properties.runReport({
+      property,
+      requestBody: {
+        dateRanges,
+        dimensions: [{ name: 'sessionCampaignName' }, { name: 'sessionSource' }],
+        metrics:    [{ name: 'eventCount' }],
+        dimensionFilter: {
+          filter: {
+            fieldName:    'eventName',
+            stringFilter: { matchType: 'EXACT', value: CONVERSION_EVENT },
+          },
+        },
+        orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
+      },
+    }),
+  ]);
+
+  // ── Parse sessions by day ───────────────────────────────────────────────────
+  const byDay: AnalyticsDayRow[] = (sessionRes.data.rows ?? []).map((row) => {
     const dims    = row.dimensionValues ?? [];
     const metrics = row.metricValues   ?? [];
-
-    // GA4 returns date as YYYYMMDD — normalise to YYYY-MM-DD
     const rawDate = dims[0]?.value ?? '';
     const date    = rawDate.length === 8
       ? `${rawDate.slice(0, 4)}-${rawDate.slice(4, 6)}-${rawDate.slice(6, 8)}`
       : rawDate;
-
     return {
       date,
       channel:   dims[1]?.value    ?? 'Unknown',
@@ -83,5 +129,23 @@ export async function getAnalyticsData(
     };
   });
 
-  return { byDay };
+  // ── Parse completions by source ─────────────────────────────────────────────
+  const conversionsBySource: ConversionBySource[] = (sourceRes.data.rows ?? [])
+    .map((row) => ({
+      source:      row.dimensionValues?.[0]?.value ?? 'unknown',
+      medium:      row.dimensionValues?.[1]?.value ?? 'unknown',
+      completions: Number(row.metricValues?.[0]?.value ?? 0),
+    }))
+    .filter((r) => r.completions > 0);
+
+  // ── Parse completions by campaign ───────────────────────────────────────────
+  const conversionsByCampaign: ConversionByCampaign[] = (campaignRes.data.rows ?? [])
+    .map((row) => ({
+      campaign:    row.dimensionValues?.[0]?.value ?? '(not set)',
+      source:      row.dimensionValues?.[1]?.value ?? 'unknown',
+      completions: Number(row.metricValues?.[0]?.value ?? 0),
+    }))
+    .filter((r) => r.completions > 0 && r.campaign !== '(not set)');
+
+  return { byDay, conversionsBySource, conversionsByCampaign };
 }

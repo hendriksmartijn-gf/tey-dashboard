@@ -383,7 +383,7 @@ export default function DashboardPage() {
         {/* ── Google Analytics ── */}
         <section>
           <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-4">Website — Google Analytics</h2>
-          <AnalyticsSection dateFrom={dateFrom} dateTo={dateTo} />
+          <AnalyticsSection dateFrom={dateFrom} dateTo={dateTo} liSpend={liTotals.spend} meSpend={meTotals.spend} />
         </section>
 
       </div>
