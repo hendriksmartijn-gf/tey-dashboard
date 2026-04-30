@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts';
-import type { AnalyticsDayRow, ConversionBySource, ConversionByCampaign, ConversionByJob, GoogleAdsCampaignRow, GoogleAdsDayRow } from '@/lib/analytics';
+import type { AnalyticsDayRow, ConversionBySource, ConversionByCampaign, ConversionByJob, ApplicationStart, GoogleAdsCampaignRow, GoogleAdsDayRow } from '@/lib/analytics';
 import GoogleAdsSection, { GoogleAdsSectionSkeleton } from '@/components/GoogleAdsSection';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -111,6 +111,7 @@ interface AnalyticsData {
   conversionsBySource:   ConversionBySource[];
   conversionsByCampaign: ConversionByCampaign[];
   conversionsByJob:      ConversionByJob[];
+  applicationStarts:     ApplicationStart[];
   googleAds: {
     campaigns: GoogleAdsCampaignRow[];
     byDay:     GoogleAdsDayRow[];
@@ -186,27 +187,53 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
     return data.conversionsByCampaign.slice(0, 15); // top 15
   }, [data]);
 
-  // Completions by job title — pivoted by platform
+  // Completions by job title — pivoted by platform, joined with starts
   const jobRows = useMemo(() => {
     if (!data) return [];
-    const map = new Map<string, { linkedin: number; meta: number; google: number; other: number }>();
+
+    // Aggregate completions per job × platform
+    const compMap = new Map<string, { linkedin: number; meta: number; google: number; other: number }>();
     for (const r of data.conversionsByJob) {
       const ch  = sourceToChannel(r.source);
-      const cur = map.get(r.jobTitle) ?? { linkedin: 0, meta: 0, google: 0, other: 0 };
+      const cur = compMap.get(r.jobTitle) ?? { linkedin: 0, meta: 0, google: 0, other: 0 };
       cur[ch] += r.completions;
-      map.set(r.jobTitle, cur);
+      compMap.set(r.jobTitle, cur);
     }
-    return Array.from(map.entries())
-      .map(([jobTitle, v]) => ({
-        jobTitle,
-        linkedin: v.linkedin,
-        meta:     v.meta,
-        google:   v.google,
-        other:    v.other,
-        total:    v.linkedin + v.meta + v.google + v.other,
-      }))
-      .sort((a, b) => b.total - a.total);
+
+    // Aggregate starts per job title (across all sources)
+    const startsMap = new Map<string, number>();
+    for (const r of data.applicationStarts) {
+      startsMap.set(r.jobTitle, (startsMap.get(r.jobTitle) ?? 0) + r.starts);
+    }
+
+    // Union of all known job titles (some may only have starts, not yet completions)
+    const allTitles = new Set([...compMap.keys(), ...startsMap.keys()]);
+
+    return Array.from(allTitles)
+      .map((jobTitle) => {
+        const v      = compMap.get(jobTitle) ?? { linkedin: 0, meta: 0, google: 0, other: 0 };
+        const starts = startsMap.get(jobTitle) ?? 0;
+        const completed = v.linkedin + v.meta + v.google + v.other;
+        return {
+          jobTitle,
+          linkedin:  v.linkedin,
+          meta:      v.meta,
+          google:    v.google,
+          other:     v.other,
+          starts,
+          completed,
+          convRate:  starts > 0 ? completed / starts : null,
+        };
+      })
+      .sort((a, b) => b.completed - a.completed || b.starts - a.starts);
   }, [data]);
+
+  // Overall funnel totals
+  const funnelTotals = useMemo(() => {
+    const starts    = jobRows.reduce((s, r) => s + r.starts, 0);
+    const completed = jobRows.reduce((s, r) => s + r.completed, 0);
+    return { starts, completed, rate: starts > 0 ? completed / starts : null };
+  }, [jobRows]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
@@ -273,6 +300,68 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
           <p className="text-xs text-gray-400 mt-1">Sessies → sollicitatie</p>
         </div>
       </div>
+
+      {/* ── Application funnel ── */}
+      {funnelTotals.starts > 0 && (
+        <div className="bg-white overflow-hidden" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
+          <div className="px-5 py-4" style={{ borderBottom: '1px solid #DCE0E6' }}>
+            <span className="gf-eyebrow">Sollicitatiefunnel</span>
+          </div>
+          <div className="px-5 py-5">
+            {/* Step bar */}
+            <div className="flex items-stretch gap-0 mb-5">
+              {/* Started */}
+              <div className="flex-1 rounded-l-lg px-5 py-4" style={{ background: '#F0F4F8' }}>
+                <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#8C9BAF' }}>Formulier gestart</p>
+                <p className="text-3xl font-bold tabular-nums" style={{ color: '#12101F' }}>{fmtNum(funnelTotals.starts)}</p>
+                <p className="text-xs mt-1" style={{ color: '#BCC4CF' }}>application_form_start</p>
+              </div>
+
+              {/* Arrow */}
+              <div className="flex items-center px-3" style={{ color: '#BCC4CF' }}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M4 10h12M12 6l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+
+              {/* Completed */}
+              <div className="flex-1 px-5 py-4" style={{ background: '#F0F4F8' }}>
+                <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#8C9BAF' }}>Sollicitatie voltooid</p>
+                <p className="text-3xl font-bold tabular-nums" style={{ color: '#12101F' }}>{fmtNum(funnelTotals.completed)}</p>
+                <p className="text-xs mt-1" style={{ color: '#BCC4CF' }}>Sollicitatie_voltooid_recruitee</p>
+              </div>
+
+              {/* Arrow */}
+              <div className="flex items-center px-3" style={{ color: '#BCC4CF' }}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path d="M4 10h12M12 6l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+
+              {/* Conversion rate */}
+              <div className="flex-1 rounded-r-lg px-5 py-4" style={{ background: funnelTotals.rate !== null && funnelTotals.rate >= 0.5 ? 'rgba(22,163,74,0.06)' : '#F0F4F8', border: funnelTotals.rate !== null && funnelTotals.rate >= 0.5 ? '1px solid rgba(22,163,74,0.2)' : undefined }}>
+                <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#8C9BAF' }}>Afrondingsratio</p>
+                <p className="text-3xl font-bold tabular-nums" style={{ color: funnelTotals.rate !== null && funnelTotals.rate >= 0.5 ? '#16A34A' : '#12101F' }}>
+                  {funnelTotals.rate !== null ? `${(funnelTotals.rate * 100).toFixed(1)}%` : '—'}
+                </p>
+                <p className="text-xs mt-1" style={{ color: '#BCC4CF' }}>Gestart → voltooid</p>
+              </div>
+            </div>
+
+            {/* Drop-off note */}
+            {funnelTotals.rate !== null && (
+              <div className="flex items-center gap-2 text-xs" style={{ color: '#8C9BAF' }}>
+                <span style={{ color: '#BCC4CF' }}>↳</span>
+                <span>
+                  <span className="font-semibold" style={{ color: '#555E6C' }}>{fmtNum(funnelTotals.starts - funnelTotals.completed)}</span>
+                  {' '}mensen startten maar voltooiden de sollicitatie niet
+                  {' '}(<span className="font-semibold" style={{ color: '#555E6C' }}>{((1 - funnelTotals.rate) * 100).toFixed(1)}%</span> uitval)
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── Sessions trend ── */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
@@ -355,32 +444,46 @@ export default function AnalyticsSection({ dateFrom, dateTo, liSpend = 0, meSpen
                   <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#1877F2' }}>Meta</th>
                   <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#F59E0B' }}>Google</th>
                   <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Overig</th>
-                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#12101F' }}>Totaal</th>
+                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Gestart</th>
+                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#12101F' }}>Voltooid</th>
+                  <th className="px-5 py-3 text-right text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: '#8C9BAF' }}>Ratio</th>
                 </tr>
               </thead>
               <tbody>
-                {jobRows.map((r, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #F0F4F8' }} className="last:border-0 hover:bg-[#F0F4F8]/60 transition-colors">
-                    <td className="px-5 py-3 font-medium" title={r.jobTitle} style={{ color: '#12101F', maxWidth: '420px' }}>
-                      {shortTitle(r.jobTitle)}
-                    </td>
-                    <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.linkedin > 0 ? '#0077B5' : '#BCC4CF', fontWeight: r.linkedin > 0 ? 600 : 400 }}>
-                      {r.linkedin > 0 ? fmtNum(r.linkedin) : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.meta > 0 ? '#1877F2' : '#BCC4CF', fontWeight: r.meta > 0 ? 600 : 400 }}>
-                      {r.meta > 0 ? fmtNum(r.meta) : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.google > 0 ? '#F59E0B' : '#BCC4CF', fontWeight: r.google > 0 ? 600 : 400 }}>
-                      {r.google > 0 ? fmtNum(r.google) : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.other > 0 ? '#555E6C' : '#BCC4CF', fontWeight: r.other > 0 ? 600 : 400 }}>
-                      {r.other > 0 ? fmtNum(r.other) : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-right tabular-nums font-bold" style={{ color: '#12101F' }}>
-                      {fmtNum(r.total)}
-                    </td>
-                  </tr>
-                ))}
+                {jobRows.map((r, i) => {
+                  const rateColor = r.convRate === null ? '#BCC4CF'
+                    : r.convRate >= 0.7 ? '#16A34A'
+                    : r.convRate >= 0.4 ? '#F59E0B'
+                    : '#E02D3C';
+                  return (
+                    <tr key={i} style={{ borderBottom: '1px solid #F0F4F8' }} className="last:border-0 hover:bg-[#F0F4F8]/60 transition-colors">
+                      <td className="px-5 py-3 font-medium" title={r.jobTitle} style={{ color: '#12101F', maxWidth: '380px' }}>
+                        {shortTitle(r.jobTitle)}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.linkedin > 0 ? '#0077B5' : '#BCC4CF', fontWeight: r.linkedin > 0 ? 600 : 400 }}>
+                        {r.linkedin > 0 ? fmtNum(r.linkedin) : '—'}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.meta > 0 ? '#1877F2' : '#BCC4CF', fontWeight: r.meta > 0 ? 600 : 400 }}>
+                        {r.meta > 0 ? fmtNum(r.meta) : '—'}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.google > 0 ? '#F59E0B' : '#BCC4CF', fontWeight: r.google > 0 ? 600 : 400 }}>
+                        {r.google > 0 ? fmtNum(r.google) : '—'}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.other > 0 ? '#555E6C' : '#BCC4CF', fontWeight: r.other > 0 ? 600 : 400 }}>
+                        {r.other > 0 ? fmtNum(r.other) : '—'}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums" style={{ color: r.starts > 0 ? '#555E6C' : '#BCC4CF' }}>
+                        {r.starts > 0 ? fmtNum(r.starts) : '—'}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums font-bold" style={{ color: '#12101F' }}>
+                        {fmtNum(r.completed)}
+                      </td>
+                      <td className="px-5 py-3 text-right tabular-nums font-semibold whitespace-nowrap" style={{ color: rateColor }}>
+                        {r.convRate !== null ? `${(r.convRate * 100).toFixed(0)}%` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

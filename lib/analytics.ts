@@ -50,6 +50,12 @@ export interface ConversionByJob {
   completions: number;
 }
 
+export interface ApplicationStart {
+  jobTitle: string;
+  source:   string;
+  starts:   number;
+}
+
 export interface GoogleAdsCampaignRow {
   campaign:    string;
   network:     string; // Search, Display, YouTube, etc.
@@ -84,6 +90,7 @@ export interface AnalyticsSummary {
   conversionsBySource:   ConversionBySource[];
   conversionsByCampaign: ConversionByCampaign[];
   conversionsByJob:      ConversionByJob[];
+  applicationStarts:     ApplicationStart[];
   googleAds: {
     campaigns: GoogleAdsCampaignRow[];
     byDay:     GoogleAdsDayRow[];
@@ -103,7 +110,7 @@ export async function getAnalyticsData(
   const property   = `properties/${propertyId}`;
   const dateRanges = [{ startDate, endDate }];
 
-  const [sessionRes, sourceRes, campaignRes, adsRes, adsDayRes, jobRes] = await Promise.all([
+  const [sessionRes, sourceRes, campaignRes, adsRes, adsDayRes, jobRes, startsRes] = await Promise.all([
 
     // 1. Sessions + key events by date × channel
     analytics.properties.runReport({
@@ -205,6 +212,20 @@ export async function getAnalyticsData(
         orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
       },
     }).catch(() => ({ data: { rows: [] } })),
+
+    // 7. Application form starts by page title × session source (funnel top)
+    analytics.properties.runReport({
+      property,
+      requestBody: {
+        dateRanges,
+        dimensions: [{ name: 'pageTitle' }, { name: 'sessionSource' }],
+        metrics:    [{ name: 'eventCount' }],
+        dimensionFilter: {
+          filter: { fieldName: 'eventName', stringFilter: { matchType: 'EXACT', value: 'application_form_start' } },
+        },
+        orderBys: [{ metric: { metricName: 'eventCount' }, desc: true }],
+      },
+    }).catch(() => ({ data: { rows: [] } })),
   ]);
 
   // ── Parse sessions by day ───────────────────────────────────────────────────
@@ -295,11 +316,21 @@ export async function getAnalyticsData(
     }))
     .filter((r) => r.completions > 0 && r.jobTitle !== '(not set)');
 
+  // ── Parse application form starts by page title × source ────────────────────
+  const applicationStarts: ApplicationStart[] = (startsRes.data.rows ?? [])
+    .map((row) => ({
+      jobTitle: row.dimensionValues?.[0]?.value ?? '(unknown)',
+      source:   row.dimensionValues?.[1]?.value ?? 'unknown',
+      starts:   Number(row.metricValues?.[0]?.value ?? 0),
+    }))
+    .filter((r) => r.starts > 0 && r.jobTitle !== '(not set)');
+
   return {
     byDay,
     conversionsBySource,
     conversionsByCampaign,
     conversionsByJob,
+    applicationStarts,
     googleAds: { campaigns: adsCampaigns, byDay: adsByDay },
   };
 }
