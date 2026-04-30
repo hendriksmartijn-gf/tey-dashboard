@@ -7,10 +7,24 @@ import type { ConversionByJob, ApplicationStart } from '@/lib/analytics';
 
 const fmtNum = (n: number) => n.toLocaleString('nl-NL');
 
-const TITLE_PREFIX = 'Forensisch centrum Teylingereind - ';
-function shortTitle(raw: string): string {
-  return raw.startsWith(TITLE_PREFIX) ? raw.slice(TITLE_PREFIX.length) : raw;
+// Normalize a GA4 page title to the canonical vacancy name.
+// GA4 uses different page titles per stage:
+//   "… - Sollicitatie"   → form start page  (application_form_start fires here)
+//   "… - Gesolliciteerd" → confirmation page (Sollicitatie_voltooid_recruitee fires here)
+// Strip both suffixes AND the org-name prefix so starts and completions join correctly.
+const TITLE_PREFIX   = 'Forensisch centrum Teylingereind - ';
+const STAGE_SUFFIXES = [' - Gesolliciteerd', ' - Sollicitatie'];
+
+function normalizeJobTitle(raw: string): string {
+  let t = raw.startsWith(TITLE_PREFIX) ? raw.slice(TITLE_PREFIX.length) : raw;
+  for (const suffix of STAGE_SUFFIXES) {
+    if (t.endsWith(suffix)) { t = t.slice(0, -suffix.length); break; }
+  }
+  return t.trim();
 }
+
+// shortTitle = same normalization (used for display)
+function shortTitle(raw: string): string { return normalizeJobTitle(raw); }
 
 function sourceToChannel(source: string): 'linkedin' | 'meta' | 'google' | 'other' {
   const s = source.toLowerCase();
@@ -204,13 +218,13 @@ export default function SollicitatiesSection({ dateFrom, dateTo }: Props) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // All unique job titles (union of completions + starts)
+  // All unique normalized vacancy names (union of completions + starts)
   const allTitles = useMemo(() => {
     if (!data) return [];
     const set = new Set<string>();
-    for (const r of data.conversionsByJob)  set.add(r.jobTitle);
-    for (const r of data.applicationStarts) set.add(r.jobTitle);
-    return Array.from(set).sort((a, b) => shortTitle(a).localeCompare(shortTitle(b)));
+    for (const r of data.conversionsByJob)  set.add(normalizeJobTitle(r.jobTitle));
+    for (const r of data.applicationStarts) set.add(normalizeJobTitle(r.jobTitle));
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [data]);
 
   // Init selection to all when data loads
@@ -218,23 +232,28 @@ export default function SollicitatiesSection({ dateFrom, dateTo }: Props) {
     setSelectedTitles(new Set(allTitles));
   }, [allTitles]);
 
-  // Pivot completions by job × platform, filtered by selection
+  // Pivot completions by job × platform, filtered by selection.
+  // normalizeJobTitle() strips the page-stage suffix so that
+  // "… - Sollicitatie" (starts) and "… - Gesolliciteerd" (completions)
+  // collapse to the same vacancy key.
   const jobRows = useMemo(() => {
     if (!data) return [];
 
     const compMap = new Map<string, { linkedin: number; meta: number; google: number; other: number }>();
     for (const r of data.conversionsByJob) {
-      if (selectedTitles.size > 0 && !selectedTitles.has(r.jobTitle)) continue;
+      const key = normalizeJobTitle(r.jobTitle);
+      if (selectedTitles.size > 0 && !selectedTitles.has(key)) continue;
       const ch  = sourceToChannel(r.source);
-      const cur = compMap.get(r.jobTitle) ?? { linkedin: 0, meta: 0, google: 0, other: 0 };
+      const cur = compMap.get(key) ?? { linkedin: 0, meta: 0, google: 0, other: 0 };
       cur[ch] += r.completions;
-      compMap.set(r.jobTitle, cur);
+      compMap.set(key, cur);
     }
 
     const startsMap = new Map<string, number>();
     for (const r of data.applicationStarts) {
-      if (selectedTitles.size > 0 && !selectedTitles.has(r.jobTitle)) continue;
-      startsMap.set(r.jobTitle, (startsMap.get(r.jobTitle) ?? 0) + r.starts);
+      const key = normalizeJobTitle(r.jobTitle);
+      if (selectedTitles.size > 0 && !selectedTitles.has(key)) continue;
+      startsMap.set(key, (startsMap.get(key) ?? 0) + r.starts);
     }
 
     const allFiltered = new Set([...compMap.keys(), ...startsMap.keys()]);
@@ -244,7 +263,7 @@ export default function SollicitatiesSection({ dateFrom, dateTo }: Props) {
         const starts    = startsMap.get(jobTitle) ?? 0;
         const completed = v.linkedin + v.meta + v.google + v.other;
         return {
-          jobTitle,
+          jobTitle,   // already normalized — used directly for display
           linkedin: v.linkedin,
           meta:     v.meta,
           google:   v.google,
@@ -379,7 +398,7 @@ export default function SollicitatiesSection({ dateFrom, dateTo }: Props) {
                   return (
                     <tr key={i} style={{ borderBottom: '1px solid #F0F4F8' }} className="last:border-0 hover:bg-[#F0F4F8]/60 transition-colors">
                       <td className="px-5 py-3.5 font-medium" title={r.jobTitle} style={{ color: '#12101F', maxWidth: '380px' }}>
-                        {shortTitle(r.jobTitle)}
+                        {r.jobTitle}
                       </td>
                       <td className="px-5 py-3.5 text-right tabular-nums" style={{ color: r.linkedin > 0 ? '#0077B5' : '#BCC4CF', fontWeight: r.linkedin > 0 ? 600 : 400 }}>
                         {r.linkedin > 0 ? fmtNum(r.linkedin) : '—'}
