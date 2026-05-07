@@ -242,18 +242,15 @@ export default function DashboardPage() {
     <main className="min-h-screen" style={{ background: '#F0F4F8' }}>
 
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20" style={{ background: '#12101F' }}>
-        <div className="max-w-[1280px] mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <header className="sticky top-0 z-20" style={{ background: 'var(--gf-slate-200)', borderBottom: '1px solid var(--gf-slate-300)' }}>
+        <div className="max-w-[1280px] mx-auto px-6 h-28 flex items-center justify-between">
+          <div className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="https://gejpuoflv9o0rxbb.public.blob.vercel-storage.com/Teylingereind%20Logo%20_%20Fullcolour.svg"
               alt="Teylingereind"
-              className="h-8 w-auto"
+              className="h-16 w-auto"
             />
-            <span className="hidden sm:inline text-xs px-2 py-0.5 font-semibold" style={{ background: 'rgba(99,49,244,0.25)', color: '#A38DFB', borderRadius: '4px' }}>
-              Recruitment
-            </span>
           </div>
           <button
             onClick={fetchData}
@@ -269,7 +266,7 @@ export default function DashboardPage() {
       </header>
 
       {/* ── Control bar ─────────────────────────────────────────────── */}
-      <div className="sticky top-14 z-10 bg-white" style={{ borderBottom: '1px solid #DCE0E6' }}>
+      <div className="sticky top-28 z-10 bg-white" style={{ borderBottom: '1px solid #DCE0E6' }}>
         <div className="max-w-[1280px] mx-auto px-6">
 
           {/* Row 1: centered nav */}
