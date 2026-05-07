@@ -247,7 +247,7 @@ export default function DashboardPage() {
           {/* Logo */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="https://gejpuoflv9o0rxbb.public.blob.vercel-storage.com/Teylingereind%20Logo%20_%20Fullcolour.svg"
+            src="/teylingereind-logo.svg"
             alt="Teylingereind"
             width={440}
             height={160}
