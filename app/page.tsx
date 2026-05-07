@@ -243,19 +243,46 @@ export default function DashboardPage() {
 
       {/* ── Header ─────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20" style={{ background: 'var(--gf-slate-200)', borderBottom: '1px solid var(--gf-slate-300)' }}>
-        <div className="max-w-[1280px] mx-auto px-6 h-28 flex items-center justify-between">
-          <div className="flex items-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="https://gejpuoflv9o0rxbb.public.blob.vercel-storage.com/Teylingereind%20Logo%20_%20Fullcolour.svg"
-              alt="Teylingereind"
-              className="h-16 w-auto"
-            />
-          </div>
+        <div className="max-w-[1280px] mx-auto px-6 h-28 flex items-center justify-between gap-8">
+          {/* Logo */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://gejpuoflv9o0rxbb.public.blob.vercel-storage.com/Teylingereind%20Logo%20_%20Fullcolour.svg"
+            alt="Teylingereind"
+            style={{ height: '80px', width: 'auto', flexShrink: 0 }}
+          />
+
+          {/* Tab nav */}
+          <nav className="flex items-center gap-1">
+            {([
+              { key: 'ads' as Tab,           label: 'Advertenties' },
+              { key: 'sollicitaties' as Tab, label: 'Sollicitaties' },
+              { key: 'ga4' as Tab,           label: 'GA4 — Website' },
+            ] as { key: Tab; label: string }[]).map(({ key, label }) => {
+              const active = tab === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setTab(key)}
+                  className="relative px-5 py-2 text-sm font-semibold rounded-lg transition-all"
+                  style={{
+                    background: active ? 'var(--gf-purple-600)' : 'transparent',
+                    color: active ? '#ffffff' : 'var(--gf-slate-700)',
+                  }}
+                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--gf-slate-300)'; }}
+                  onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Vernieuwen */}
           <button
             onClick={fetchData}
             disabled={loading}
-            className="text-xs font-semibold disabled:opacity-40 transition-all rounded-lg px-4 py-2"
+            className="text-xs font-semibold disabled:opacity-40 transition-all rounded-lg px-4 py-2 flex-shrink-0"
             style={{ background: 'var(--gf-purple-600)', color: '#ffffff' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--gf-purple-700)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--gf-purple-600)')}
@@ -269,34 +296,7 @@ export default function DashboardPage() {
       <div className="sticky top-28 z-10 bg-white" style={{ borderBottom: '1px solid #DCE0E6' }}>
         <div className="max-w-[1280px] mx-auto px-6">
 
-          {/* Row 1: centered nav */}
-          <nav className="flex items-center justify-center" style={{ borderBottom: '1px solid #F0F4F8' }}>
-            {([
-              { key: 'ads' as Tab,           label: 'Advertenties' },
-              { key: 'sollicitaties' as Tab, label: 'Sollicitaties' },
-              { key: 'ga4' as Tab,           label: 'GA4 — Website' },
-            ] as { key: Tab; label: string }[]).map(({ key, label }) => {
-              const active = tab === key;
-              return (
-                <button
-                  key={key}
-                  onClick={() => setTab(key)}
-                  className="relative px-6 py-4 text-sm font-semibold transition-colors"
-                  style={{ color: active ? '#12101F' : '#8C9BAF', letterSpacing: '-0.01em' }}
-                >
-                  {label}
-                  {active && (
-                    <span
-                      className="absolute bottom-0 left-4 right-4"
-                      style={{ height: '2px', background: '#6331F4', borderRadius: '2px 2px 0 0' }}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </nav>
-
-          {/* Row 2: period presets */}
+          {/* Period presets */}
           <div className="flex flex-wrap items-center gap-2 py-3">
             <span className="gf-eyebrow mr-1 hidden sm:inline-flex">Periode</span>
             <div className="flex items-center gap-1.5 flex-wrap">
