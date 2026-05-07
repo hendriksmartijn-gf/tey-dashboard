@@ -244,9 +244,13 @@ export default function DashboardPage() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-20" style={{ background: '#12101F' }}>
         <div className="max-w-[1280px] mx-auto px-6 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="w-5 h-5 rounded-sm flex-shrink-0" style={{ background: '#6331F4' }} aria-hidden="true" />
-            <span className="text-sm font-bold text-white tracking-tight">Teylingereind</span>
+          <div className="flex items-center gap-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://gejpuoflv9o0rxbb.public.blob.vercel-storage.com/Teylingereind%20Logo%20_%20Fullcolour.svg"
+              alt="Teylingereind"
+              className="h-8 w-auto"
+            />
             <span className="hidden sm:inline text-xs px-2 py-0.5 font-semibold" style={{ background: 'rgba(99,49,244,0.25)', color: '#A38DFB', borderRadius: '4px' }}>
               Recruitment
             </span>
