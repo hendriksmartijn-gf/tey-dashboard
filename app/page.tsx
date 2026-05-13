@@ -242,35 +242,19 @@ export default function DashboardPage() {
     <main className="min-h-screen" style={{ background: '#F0F4F8' }}>
 
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <header style={{ background: 'var(--gf-slate-200)', borderBottom: '1px solid var(--gf-slate-300)' }}>
-        <div className="max-w-[1280px] mx-auto px-6 h-36 flex items-center justify-between gap-8">
+      <header className="sticky top-0 z-20 bg-white" style={{ borderBottom: '1px solid #DCE0E6' }}>
+        <div className="max-w-[1280px] mx-auto px-6 h-16 grid items-center" style={{ gridTemplateColumns: '1fr auto 1fr' }}>
+
+          {/* Logo — left */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/teylingereind-logo.svg"
             alt="Teylingereind"
-            width={440}
-            height={160}
-            style={{ height: '120px', width: 'auto', maxWidth: '440px', flexShrink: 0, display: 'block' }}
+            style={{ height: '36px', width: 'auto', display: 'block' }}
           />
-          <button
-            onClick={fetchData}
-            disabled={loading}
-            className="text-xs font-semibold disabled:opacity-40 transition-colors flex-shrink-0"
-            style={{ color: 'var(--gf-slate-500)' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--gf-slate-700)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--gf-slate-500)')}
-          >
-            {loading ? 'Laden…' : '↺ Vernieuwen'}
-          </button>
-        </div>
-      </header>
 
-      {/* ── Nav + filters (sticky) ───────────────────────────────── */}
-      <div className="sticky top-0 z-20 bg-white" style={{ borderBottom: '1px solid #DCE0E6' }}>
-        <div className="max-w-[1280px] mx-auto px-6">
-
-          {/* Nav */}
-          <nav className="flex items-center justify-center" style={{ borderBottom: '1px solid #F0F4F8' }}>
+          {/* Nav — center */}
+          <nav className="flex items-center">
             {([
               { key: 'ads' as Tab,           label: 'Advertenties' },
               { key: 'sollicitaties' as Tab, label: 'Sollicitaties' },
@@ -281,7 +265,7 @@ export default function DashboardPage() {
                 <button
                   key={key}
                   onClick={() => setTab(key)}
-                  className="relative px-8 py-4 text-sm transition-colors"
+                  className="relative h-16 px-6 text-sm transition-colors"
                   style={{
                     fontWeight: active ? 700 : 500,
                     color: active ? '#12101F' : '#8C9BAF',
@@ -293,7 +277,7 @@ export default function DashboardPage() {
                   {label}
                   {active && (
                     <span
-                      className="absolute bottom-0 left-6 right-6"
+                      className="absolute bottom-0 left-4 right-4"
                       style={{ height: '2px', background: '#6331F4', borderRadius: '2px 2px 0 0' }}
                     />
                   )}
@@ -301,6 +285,27 @@ export default function DashboardPage() {
               );
             })}
           </nav>
+
+          {/* Vernieuwen — right */}
+          <div className="flex justify-end">
+            <button
+              onClick={fetchData}
+              disabled={loading}
+              className="text-sm font-semibold disabled:opacity-40 transition-colors px-5 py-2 rounded-lg"
+              style={{ background: '#6331F4', color: '#ffffff' }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = '#5436CE')}
+              onMouseLeave={(e) => (e.currentTarget.style.background = '#6331F4')}
+            >
+              {loading ? 'Laden…' : '↺ Vernieuwen'}
+            </button>
+          </div>
+
+        </div>
+      </header>
+
+      {/* ── Filters bar (sticky below header) ───────────────────── */}
+      <div className="sticky top-16 z-10 bg-white" style={{ borderBottom: '1px solid #DCE0E6' }}>
+        <div className="max-w-[1280px] mx-auto px-6">
 
           {/* Period presets */}
           <div className="flex flex-wrap items-center gap-2 py-3">
