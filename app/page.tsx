@@ -242,9 +242,8 @@ export default function DashboardPage() {
     <main className="min-h-screen" style={{ background: '#F0F4F8' }}>
 
       {/* ── Header ─────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-20" style={{ background: 'var(--gf-slate-200)', borderBottom: '1px solid var(--gf-slate-300)' }}>
+      <header style={{ background: 'var(--gf-slate-200)', borderBottom: '1px solid var(--gf-slate-300)' }}>
         <div className="max-w-[1280px] mx-auto px-6 h-36 flex items-center justify-between gap-8">
-          {/* Logo */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/teylingereind-logo.svg"
@@ -253,9 +252,25 @@ export default function DashboardPage() {
             height={160}
             style={{ height: '120px', width: 'auto', maxWidth: '440px', flexShrink: 0, display: 'block' }}
           />
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="text-xs font-semibold disabled:opacity-40 transition-colors flex-shrink-0"
+            style={{ color: 'var(--gf-slate-500)' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--gf-slate-700)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--gf-slate-500)')}
+          >
+            {loading ? 'Laden…' : '↺ Vernieuwen'}
+          </button>
+        </div>
+      </header>
 
-          {/* Tab nav */}
-          <nav className="flex items-center gap-1">
+      {/* ── Nav + filters (sticky) ───────────────────────────────── */}
+      <div className="sticky top-0 z-20 bg-white" style={{ borderBottom: '1px solid #DCE0E6' }}>
+        <div className="max-w-[1280px] mx-auto px-6">
+
+          {/* Nav */}
+          <nav className="flex items-center justify-center" style={{ borderBottom: '1px solid #F0F4F8' }}>
             {([
               { key: 'ads' as Tab,           label: 'Advertenties' },
               { key: 'sollicitaties' as Tab, label: 'Sollicitaties' },
@@ -266,37 +281,26 @@ export default function DashboardPage() {
                 <button
                   key={key}
                   onClick={() => setTab(key)}
-                  className="relative px-5 py-2 text-sm font-semibold rounded-lg transition-all"
+                  className="relative px-8 py-4 text-sm transition-colors"
                   style={{
-                    background: active ? 'var(--gf-purple-600)' : 'transparent',
-                    color: active ? '#ffffff' : 'var(--gf-slate-700)',
+                    fontWeight: active ? 700 : 500,
+                    color: active ? '#12101F' : '#8C9BAF',
+                    letterSpacing: '-0.01em',
                   }}
-                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--gf-slate-300)'; }}
-                  onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent'; }}
+                  onMouseEnter={(e) => { if (!active) e.currentTarget.style.color = '#555E6C'; }}
+                  onMouseLeave={(e) => { if (!active) e.currentTarget.style.color = '#8C9BAF'; }}
                 >
                   {label}
+                  {active && (
+                    <span
+                      className="absolute bottom-0 left-6 right-6"
+                      style={{ height: '2px', background: '#6331F4', borderRadius: '2px 2px 0 0' }}
+                    />
+                  )}
                 </button>
               );
             })}
           </nav>
-
-          {/* Vernieuwen */}
-          <button
-            onClick={fetchData}
-            disabled={loading}
-            className="text-xs font-semibold disabled:opacity-40 transition-all rounded-lg px-4 py-2 flex-shrink-0"
-            style={{ background: 'var(--gf-purple-600)', color: '#ffffff' }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--gf-purple-700)')}
-            onMouseLeave={(e) => (e.currentTarget.style.background = 'var(--gf-purple-600)')}
-          >
-            {loading ? 'Laden…' : '↺ Vernieuwen'}
-          </button>
-        </div>
-      </header>
-
-      {/* ── Control bar ─────────────────────────────────────────────── */}
-      <div className="sticky top-36 z-10 bg-white" style={{ borderBottom: '1px solid #DCE0E6' }}>
-        <div className="max-w-[1280px] mx-auto px-6">
 
           {/* Period presets */}
           <div className="flex flex-wrap items-center gap-2 py-3">
