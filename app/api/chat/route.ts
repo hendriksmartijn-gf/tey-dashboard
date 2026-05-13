@@ -2,15 +2,13 @@ import { streamText } from 'ai';
 import { createOpenAI } from '@ai-sdk/openai';
 
 // Configure via .env.local:
-//   AI_GATEWAY_URL    — Vercel AI Gateway base URL
-//                       e.g. https://ai-gateway.vercel.sh/v1/{team}/{gateway}
-//                       or leave empty to hit OpenAI directly
-//   AI_GATEWAY_API_KEY — API key for the gateway (or your OpenAI key)
-//   AI_MODEL          — model slug, default: gpt-4o
+//   AI_GATEWAY_URL — Vercel AI Gateway base URL
+//                    e.g. https://ai-gateway.vercel.sh/v1/{team}/{gateway}
+//   API_KEY_TEY    — API key for the Vercel AI Gateway
 
 const openai = createOpenAI({
   baseURL: process.env.AI_GATEWAY_URL ?? 'https://api.openai.com/v1',
-  apiKey:  process.env.AI_GATEWAY_API_KEY ?? process.env.OPENAI_API_KEY ?? '',
+  apiKey:  process.env.API_KEY_TEY ?? '',
 });
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -150,14 +148,14 @@ export async function POST(req: Request) {
     const body = await req.json() as { messages?: SimpleMessage[]; context?: DashboardContext };
     const { messages = [], context } = body;
 
-    if (!process.env.AI_GATEWAY_API_KEY && !process.env.OPENAI_API_KEY) {
+    if (!process.env.API_KEY_TEY) {
       return Response.json(
-        { error: 'Geen AI API-sleutel geconfigureerd. Voeg AI_GATEWAY_API_KEY of OPENAI_API_KEY toe aan .env.local.' },
+        { error: 'Geen AI API-sleutel geconfigureerd. Voeg API_KEY_TEY toe aan .env.local.' },
         { status: 500 },
       );
     }
 
-    const model  = process.env.AI_MODEL ?? 'gpt-4o';
+    const model = 'mistral/ministral-3b';
     const system = context ? buildSystemPrompt(context) : 'Je bent een recruitment marketing adviseur.';
 
     const result = streamText({
