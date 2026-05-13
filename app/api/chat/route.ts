@@ -1,15 +1,7 @@
 import { streamText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
 
 // Configure via .env.local:
-//   AI_GATEWAY_URL — Vercel AI Gateway base URL
-//                    e.g. https://ai-gateway.vercel.sh/v1/{team}/{gateway}
-//   API_KEY_TEY    — API key for the Vercel AI Gateway
-
-const openai = createOpenAI({
-  baseURL: process.env.AI_GATEWAY_URL ?? 'https://api.openai.com/v1',
-  apiKey:  process.env.API_KEY_TEY ?? '',
-});
+//   API_KEY_TEY — Vercel AI Gateway API key
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -155,11 +147,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const model = 'mistral/ministral-3b';
     const system = context ? buildSystemPrompt(context) : 'Je bent een recruitment marketing adviseur.';
 
     const result = streamText({
-      model: openai(model),
+      model: 'mistral/ministral-3b' as Parameters<typeof streamText>[0]['model'],
       system,
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
       maxOutputTokens: 1024,
