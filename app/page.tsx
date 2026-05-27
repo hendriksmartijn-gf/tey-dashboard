@@ -5,6 +5,7 @@ import KpiCard, { KpiCardSkeleton } from '@/components/KpiCard';
 import ChannelCard, { ChannelCardSkeleton } from '@/components/ChannelCard';
 import CampaignRankTable, { CampaignRankTableSkeleton } from '@/components/CampaignRankTable';
 import CpaTrendChart, { CpaTrendChartSkeleton } from '@/components/CpaTrendChart';
+import PacingTable, { PacingTableSkeleton } from '@/components/PacingTable';
 import AnalyticsSection from '@/components/AnalyticsSection';
 import SollicitatiesSection from '@/components/SollicitatiesSection';
 import GoogleAdsWrapper from '@/components/GoogleAdsWrapper';
@@ -321,16 +322,24 @@ export default function DashboardPage() {
   );
   const effectiveObjective: Objective = manualObjective ?? autoObjective;
 
-  // Campaign summaries (spotlight)
+  // Campaign summaries (spotlight + uitschieters)
   const campaignSummaries = useMemo(() => {
-    const map = new Map<string, { platform: Platform; spend: number; applicants: number; clicks: number; impressions: number }>();
+    const map = new Map<string, {
+      platform:    Platform;
+      spend:       number;
+      applicants:  number;
+      clicks:      number;
+      impressions: number;
+      thruplays:   number;
+    }>();
     for (const r of filteredRows) {
       const key = `${r.platform}::${r.campaign_name}`;
-      const cur = map.get(key) ?? { platform: r.platform, spend: 0, applicants: 0, clicks: 0, impressions: 0 };
+      const cur = map.get(key) ?? { platform: r.platform, spend: 0, applicants: 0, clicks: 0, impressions: 0, thruplays: 0 };
       cur.spend       += r.spend;
       cur.applicants  += r.conversions;
       cur.clicks      += r.clicks;
       cur.impressions += r.impressions;
+      cur.thruplays   += r.thruplays ?? 0;
       map.set(key, cur);
     }
     return Array.from(map.entries()).map(([key, v]) => ({
@@ -339,8 +348,13 @@ export default function DashboardPage() {
       spend:         v.spend,
       applicants:    v.applicants,
       clicks:        v.clicks,
-      cpa:           v.applicants > 0 ? v.spend / v.applicants : Infinity,
-      cpc:           v.clicks     > 0 ? v.spend / v.clicks     : Infinity,
+      impressions:   v.impressions,
+      thruplays:     v.thruplays,
+      cpa:   v.applicants  > 0 ? v.spend / v.applicants  : Infinity,
+      cpc:   v.clicks      > 0 ? v.spend / v.clicks      : Infinity,
+      cpcv:  v.thruplays   > 0 ? v.spend / v.thruplays   : Infinity,
+      cpm:   v.impressions > 0 ? v.spend / v.impressions * 1000 : Infinity,
+      vtr:   v.impressions > 0 ? v.thruplays / v.impressions    : 0,
     }));
   }, [filteredRows]);
 
@@ -350,6 +364,18 @@ export default function DashboardPage() {
   );
   const bestCpcCampaign = useMemo(() =>
     [...campaignSummaries].filter((c) => c.clicks > 0).sort((a, b) => a.cpc - b.cpc)[0] ?? null,
+    [campaignSummaries],
+  );
+  const bestCpcvCampaign = useMemo(() =>
+    [...campaignSummaries].filter((c) => c.thruplays > 0).sort((a, b) => a.cpcv - b.cpcv)[0] ?? null,
+    [campaignSummaries],
+  );
+  const bestVtrCampaign = useMemo(() =>
+    [...campaignSummaries].filter((c) => c.impressions > 0 && c.thruplays > 0).sort((a, b) => b.vtr - a.vtr)[0] ?? null,
+    [campaignSummaries],
+  );
+  const bestCpmCampaign = useMemo(() =>
+    [...campaignSummaries].filter((c) => c.impressions > 0).sort((a, b) => a.cpm - b.cpm)[0] ?? null,
     [campaignSummaries],
   );
 
@@ -809,13 +835,16 @@ export default function DashboardPage() {
                 )}
               </section>
 
-              {/* CPA trend */}
+              {/* Trend line – metric auto-adapts to objective, platforms toggleable */}
               <section>
-                <h2 className="gf-eyebrow mb-5">CPA trend</h2>
-                {loading ? <CpaTrendChartSkeleton /> : <CpaTrendChart rows={filteredRows} />}
+                <h2 className="gf-eyebrow mb-5">Trendlijn per dag</h2>
+                {loading
+                  ? <CpaTrendChartSkeleton />
+                  : <CpaTrendChart rows={filteredRows} objective={effectiveObjective} />
+                }
               </section>
 
-              {/* Uitschieters */}
+              {/* Uitschieters – objective-aware */}
               <section>
                 <h2 className="gf-eyebrow mb-5">Uitschieters</h2>
                 {loading ? (
@@ -824,19 +853,46 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {bestCpaCampaign ? (
-                      <SpotlightCard badge="🏆" badgeColor="#16A34A" title="Beste CPA" campaignName={bestCpaCampaign.campaign_name} platform={bestCpaCampaign.platform} metric={fmtEur(bestCpaCampaign.cpa)} metricLabel="CPA" />
+                    {effectiveObjective === 'video' ? (
+                      <>
+                        {bestCpcvCampaign ? (
+                          <SpotlightCard badge="🏆" badgeColor="#16A34A" title="Laagste CPCV" campaignName={bestCpcvCampaign.campaign_name} platform={bestCpcvCampaign.platform} metric={fmtEur(bestCpcvCampaign.cpcv)} metricLabel="CPCV" />
+                        ) : (
+                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen video view data beschikbaar</div>
+                        )}
+                        {bestVtrCampaign ? (
+                          <SpotlightCard badge="▶️" badgeColor="#6331F4" title="Hoogste VTR" campaignName={bestVtrCampaign.campaign_name} platform={bestVtrCampaign.platform} metric={fmtPct(bestVtrCampaign.vtr)} metricLabel="VTR" />
+                        ) : (
+                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen VTR data beschikbaar</div>
+                        )}
+                      </>
+                    ) : effectiveObjective === 'impressies' || effectiveObjective === 'verkeer' ? (
+                      <>
+                        {bestCpmCampaign ? (
+                          <SpotlightCard badge="📡" badgeColor="#16A34A" title="Laagste CPM" campaignName={bestCpmCampaign.campaign_name} platform={bestCpmCampaign.platform} metric={fmtEur(bestCpmCampaign.cpm)} metricLabel="CPM" />
+                        ) : (
+                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen CPM data beschikbaar</div>
+                        )}
+                        {bestCpcCampaign ? (
+                          <SpotlightCard badge="🖱️" badgeColor="#16A34A" title="Laagste CPC" campaignName={bestCpcCampaign.campaign_name} platform={bestCpcCampaign.platform} metric={fmtEur(bestCpcCampaign.cpc)} metricLabel="CPC" />
+                        ) : (
+                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen klikdata beschikbaar</div>
+                        )}
+                      </>
                     ) : (
-                      <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>
-                        Geen conversiedata beschikbaar
-                      </div>
-                    )}
-                    {bestCpcCampaign ? (
-                      <SpotlightCard badge="🖱️" badgeColor="#16A34A" title="Laagste CPC" campaignName={bestCpcCampaign.campaign_name} platform={bestCpcCampaign.platform} metric={fmtEur(bestCpcCampaign.cpc)} metricLabel="CPC" />
-                    ) : (
-                      <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>
-                        Geen klikdata beschikbaar
-                      </div>
+                      /* conversies / leads */
+                      <>
+                        {bestCpaCampaign ? (
+                          <SpotlightCard badge="🏆" badgeColor="#16A34A" title={effectiveObjective === 'leads' ? 'Beste CPL' : 'Beste CPA'} campaignName={bestCpaCampaign.campaign_name} platform={bestCpaCampaign.platform} metric={fmtEur(bestCpaCampaign.cpa)} metricLabel={effectiveObjective === 'leads' ? 'CPL' : 'CPA'} />
+                        ) : (
+                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen conversiedata beschikbaar</div>
+                        )}
+                        {bestCpcCampaign ? (
+                          <SpotlightCard badge="🖱️" badgeColor="#16A34A" title="Laagste CPC" campaignName={bestCpcCampaign.campaign_name} platform={bestCpcCampaign.platform} metric={fmtEur(bestCpcCampaign.cpc)} metricLabel="CPC" />
+                        ) : (
+                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen klikdata beschikbaar</div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -846,6 +902,15 @@ export default function DashboardPage() {
               <section>
                 <h2 className="gf-eyebrow mb-5">Campagnes</h2>
                 {loading ? <CampaignRankTableSkeleton /> : <CampaignRankTable rows={filteredRows} />}
+              </section>
+
+              {/* Pacing table */}
+              <section>
+                <h2 className="gf-eyebrow mb-5">Pacing</h2>
+                {loading
+                  ? <PacingTableSkeleton />
+                  : <PacingTable allRows={rows} filteredRows={filteredRows} dateTo={dateTo} />
+                }
               </section>
 
               {/* Google Ads (GA4-attributed) */}
