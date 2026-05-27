@@ -10,6 +10,7 @@ import AnalyticsSection from '@/components/AnalyticsSection';
 import SollicitatiesSection from '@/components/SollicitatiesSection';
 import GoogleAdsWrapper from '@/components/GoogleAdsWrapper';
 import CampaignSidebar from '@/components/CampaignSidebar';
+import AnalyseTab from '@/components/AnalyseTab';
 import ChatPanel from '@/components/ChatPanel';
 import type { DashboardContext } from '@/app/api/chat/route';
 import type { CampaignRow, Platform } from '@/types/campaign';
@@ -25,7 +26,7 @@ const fmtPct = (n: number) => `${(n * 100).toFixed(2)}%`;
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 type Preset = 'week' | '14days' | 'month' | '3months' | 'custom';
-type Tab    = 'ads' | 'ga4' | 'sollicitaties';
+type Tab    = 'ads' | 'analyse' | 'ga4' | 'sollicitaties';
 
 function fmt(d: Date) {
   const y   = d.getFullYear();
@@ -519,6 +520,7 @@ export default function DashboardPage() {
           <nav className="flex items-center">
             {([
               { key: 'ads' as Tab,           label: 'Advertenties' },
+              { key: 'analyse' as Tab,       label: 'Analyse' },
               { key: 'sollicitaties' as Tab, label: 'Sollicitaties' },
               { key: 'ga4' as Tab,           label: 'GA4 — Website' },
             ] as { key: Tab; label: string }[]).map(({ key, label }) => {
@@ -924,6 +926,13 @@ export default function DashboardPage() {
 
             </div>
           </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════════ */}
+        {/* TAB: ANALYSE                                               */}
+        {/* ══════════════════════════════════════════════════════════ */}
+        {tab === 'analyse' && (
+          <AnalyseTab rows={rows} loading={loading} />
         )}
 
         {/* ══════════════════════════════════════════════════════════ */}
