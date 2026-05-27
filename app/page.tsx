@@ -240,7 +240,7 @@ export default function DashboardPage() {
   const meCpv = (meTotals.thruplays ?? 0) > 0 ? meTotals.spend / (meTotals.thruplays ?? 0) : null;
   const goCpv = (goTotals.thruplays ?? 0) > 0 ? goTotals.spend / (goTotals.thruplays ?? 0) : null;
 
-  // CPM, VTR
+  // CPM, VTR, CPCV
   const liCpm = liTotals.impressions > 0 ? liTotals.spend / liTotals.impressions * 1000 : 0;
   const meCpm = meTotals.impressions > 0 ? meTotals.spend / meTotals.impressions * 1000 : 0;
   const goCpm = goTotals.impressions > 0 ? goTotals.spend / goTotals.impressions * 1000 : 0;
@@ -249,12 +249,34 @@ export default function DashboardPage() {
   const meVtr = meTotals.impressions > 0 ? (meTotals.thruplays ?? 0) / meTotals.impressions : 0;
   const goVtr = goTotals.impressions > 0 ? (goTotals.thruplays ?? 0) / goTotals.impressions : 0;
 
-  const cpas       = [liCpa, meCpa, goCpa];
-  const minCpa     = Math.min(...cpas.filter((c): c is number => c !== null));
-  const liWins     = liCpa !== null && liCpa === minCpa;
-  const meWins     = meCpa !== null && meCpa === minCpa && !liWins;
-  const goWins     = goCpa !== null && goCpa === minCpa && !liWins && !meWins;
+  // Overall totals per objective type
+  const totalThruplays = (liTotals.thruplays ?? 0) + (meTotals.thruplays ?? 0) + (goTotals.thruplays ?? 0);
+  const overallCpcv    = totalThruplays  > 0 ? totals.spend / totalThruplays  : null;
+  const overallCpm     = totals.impressions > 0 ? totals.spend / totals.impressions * 1000 : null;
+
+  // ── Winner logic per objective ──────────────────────────────────────────────
+
+  // CPA winners (conversies/leads)
+  const cpas    = [liCpa, meCpa, goCpa];
+  const minCpa  = Math.min(...cpas.filter((c): c is number => c !== null));
+  const liWins  = liCpa !== null && liCpa === minCpa;
+  const meWins  = meCpa !== null && meCpa === minCpa && !liWins;
+  const goWins  = goCpa !== null && goCpa === minCpa && !liWins && !meWins;
   const bestChannel = liWins ? 'LinkedIn' : meWins ? 'Meta' : goWins ? 'Google Ads' : '—';
+
+  // CPCV winners (video)
+  const cpvMin       = Math.min(...[liCpv, meCpv, goCpv].filter((c): c is number => c !== null));
+  const liVideoWins  = liCpv !== null && liCpv === cpvMin;
+  const meVideoWins  = meCpv !== null && meCpv === cpvMin && !liVideoWins;
+  const goVideoWins  = goCpv !== null && goCpv === cpvMin && !liVideoWins && !meVideoWins;
+  const bestVideoChannel = liVideoWins ? 'LinkedIn' : meVideoWins ? 'Meta' : goVideoWins ? 'Google Ads' : '—';
+
+  // CPM winners (impressies/verkeer)
+  const cpmMin      = Math.min(...[liCpm, meCpm, goCpm].filter(Boolean));
+  const liCpmWins   = liCpm > 0 && liCpm === cpmMin;
+  const meCpmWins   = meCpm > 0 && meCpm === cpmMin && !liCpmWins;
+  const goCpmWins   = goCpm > 0 && goCpm === cpmMin && !liCpmWins && !meCpmWins;
+  const bestCpmChannel = liCpmWins ? 'LinkedIn' : meCpmWins ? 'Meta' : goCpmWins ? 'Google Ads' : '—';
 
   // Previous period computation
   const { prevFrom, prevTo } = useMemo(() => {
@@ -279,10 +301,12 @@ export default function DashboardPage() {
   const prevLiTotals = useMemo(() => sumRows(prevRows.filter((r) => r.platform === 'linkedin')), [prevRows]);
   const prevMeTotals = useMemo(() => sumRows(prevRows.filter((r) => r.platform === 'meta')),     [prevRows]);
   const prevGoTotals = useMemo(() => sumRows(prevRows.filter((r) => r.platform === 'google')),   [prevRows]);
-  const prevOverallCpa = prevTotals.conversions   > 0 ? prevTotals.spend   / prevTotals.conversions   : null;
-  const prevLiCpa      = prevLiTotals.conversions > 0 ? prevLiTotals.spend / prevLiTotals.conversions : null;
-  const prevMeCpa      = prevMeTotals.conversions > 0 ? prevMeTotals.spend / prevMeTotals.conversions : null;
-  const prevGoCpa      = prevGoTotals.conversions > 0 ? prevGoTotals.spend / prevGoTotals.conversions : null;
+  const prevOverallCpa      = prevTotals.conversions   > 0 ? prevTotals.spend   / prevTotals.conversions   : null;
+  const prevLiCpa           = prevLiTotals.conversions > 0 ? prevLiTotals.spend / prevLiTotals.conversions : null;
+  const prevMeCpa           = prevMeTotals.conversions > 0 ? prevMeTotals.spend / prevMeTotals.conversions : null;
+  const prevGoCpa           = prevGoTotals.conversions > 0 ? prevGoTotals.spend / prevGoTotals.conversions : null;
+  const prevTotalThruplays  = (prevLiTotals.thruplays ?? 0) + (prevMeTotals.thruplays ?? 0) + (prevGoTotals.thruplays ?? 0);
+  const prevOverallCpcv     = prevTotalThruplays > 0 ? prevTotals.spend / prevTotalThruplays : null;
 
   // Delta helper
   function delta(cur: number, prev: number): number | null {
@@ -639,6 +663,7 @@ export default function DashboardPage() {
                     Array.from({ length: 4 }).map((_, i) => <KpiCardSkeleton key={i} />)
                   ) : (
                     <>
+                      {/* Card 1: Budget — always shown */}
                       <KpiCard
                         title="Budget gespendeerd"
                         value={fmtEur(totals.spend)}
@@ -646,30 +671,80 @@ export default function DashboardPage() {
                         delta={compareEnabled ? delta(totals.spend, prevTotals.spend) : null}
                         deltaInverted={false}
                       />
-                      <KpiCard
-                        title="Totaal sollicitanten"
-                        value={fmtNum(totals.conversions)}
-                        subtitle="LinkedIn · Meta · Google Ads"
-                        delta={compareEnabled ? delta(totals.conversions, prevTotals.conversions) : null}
-                        deltaInverted={false}
-                      />
-                      <KpiCard
-                        title="Kosten per sollicitant"
-                        value={overallCpa !== null ? fmtEur(overallCpa) : '—'}
-                        subtitle="Spend ÷ sollicitanten"
-                        delta={compareEnabled && overallCpa !== null && prevOverallCpa !== null ? delta(overallCpa, prevOverallCpa) : null}
-                        deltaInverted={true}
-                      />
-                      <KpiCard
-                        title="Beste kanaal"
-                        value={bestChannel}
-                        accent={bestChannel !== '—'}
-                        subtitle={
-                          bestChannel !== '—' && isFinite(minCpa)
-                            ? `Laagste CPA: ${fmtEur(minCpa)}`
-                            : 'Geen conversiedata'
-                        }
-                      />
+
+                      {/* Cards 2–4: objective-aware */}
+                      {effectiveObjective === 'video' ? (
+                        <>
+                          <KpiCard
+                            title="Completed views"
+                            value={fmtNum(totalThruplays)}
+                            subtitle="Voltooide video views"
+                            delta={compareEnabled ? delta(totalThruplays, prevTotalThruplays) : null}
+                            deltaInverted={false}
+                          />
+                          <KpiCard
+                            title="Kosten per video view"
+                            value={overallCpcv !== null ? fmtEur(overallCpcv) : '—'}
+                            subtitle="Spend ÷ completed views"
+                            delta={compareEnabled && overallCpcv !== null && prevOverallCpcv !== null ? delta(overallCpcv, prevOverallCpcv) : null}
+                            deltaInverted={true}
+                          />
+                          <KpiCard
+                            title="Beste kanaal"
+                            value={bestVideoChannel}
+                            accent={bestVideoChannel !== '—'}
+                            subtitle={bestVideoChannel !== '—' && isFinite(cpvMin) ? `Laagste CPCV: ${fmtEur(cpvMin)}` : 'Geen videodata'}
+                          />
+                        </>
+                      ) : effectiveObjective === 'impressies' || effectiveObjective === 'verkeer' ? (
+                        <>
+                          <KpiCard
+                            title="Impressies"
+                            value={fmtNum(totals.impressions)}
+                            subtitle="Totaal bereik"
+                            delta={compareEnabled ? delta(totals.impressions, prevTotals.impressions) : null}
+                            deltaInverted={false}
+                          />
+                          <KpiCard
+                            title="CPM"
+                            value={overallCpm !== null ? fmtEur(overallCpm) : '—'}
+                            subtitle="Kosten per 1000 impressies"
+                            delta={compareEnabled && overallCpm !== null && prevTotals.impressions > 0
+                              ? delta(overallCpm, prevTotals.spend / prevTotals.impressions * 1000) : null}
+                            deltaInverted={true}
+                          />
+                          <KpiCard
+                            title="Beste kanaal"
+                            value={bestCpmChannel}
+                            accent={bestCpmChannel !== '—'}
+                            subtitle={bestCpmChannel !== '—' && isFinite(cpmMin) && cpmMin > 0 ? `Laagste CPM: ${fmtEur(cpmMin)}` : 'Geen data'}
+                          />
+                        </>
+                      ) : (
+                        /* conversies / leads (default) */
+                        <>
+                          <KpiCard
+                            title={effectiveObjective === 'leads' ? 'Totaal leads' : 'Totaal sollicitanten'}
+                            value={fmtNum(totals.conversions)}
+                            subtitle="LinkedIn · Meta · Google Ads"
+                            delta={compareEnabled ? delta(totals.conversions, prevTotals.conversions) : null}
+                            deltaInverted={false}
+                          />
+                          <KpiCard
+                            title={effectiveObjective === 'leads' ? 'Kosten per lead' : 'Kosten per sollicitant'}
+                            value={overallCpa !== null ? fmtEur(overallCpa) : '—'}
+                            subtitle="Spend ÷ conversies"
+                            delta={compareEnabled && overallCpa !== null && prevOverallCpa !== null ? delta(overallCpa, prevOverallCpa) : null}
+                            deltaInverted={true}
+                          />
+                          <KpiCard
+                            title="Beste kanaal"
+                            value={bestChannel}
+                            accent={bestChannel !== '—'}
+                            subtitle={bestChannel !== '—' && isFinite(minCpa) ? `Laagste CPA: ${fmtEur(minCpa)}` : 'Geen conversiedata'}
+                          />
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -683,9 +758,15 @@ export default function DashboardPage() {
                     <><ChannelCardSkeleton /><ChannelCardSkeleton /><ChannelCardSkeleton /></>
                   ) : (
                     <>
-                      <ChannelCard platform="linkedin" spend={liTotals.spend} applicants={liTotals.conversions} clicks={liTotals.clicks} impressions={liTotals.impressions} thruplays={liTotals.thruplays ?? 0} isWinner={liWins} forceVideoMetrics={effectiveObjective === 'video'} />
-                      <ChannelCard platform="meta"     spend={meTotals.spend} applicants={meTotals.conversions} clicks={meTotals.clicks} impressions={meTotals.impressions} thruplays={meTotals.thruplays ?? 0} isWinner={meWins} forceVideoMetrics={effectiveObjective === 'video'} />
-                      <ChannelCard platform="google"   spend={goTotals.spend} applicants={goTotals.conversions} clicks={goTotals.clicks} impressions={goTotals.impressions} thruplays={goTotals.thruplays ?? 0} isWinner={goWins} forceVideoMetrics={effectiveObjective === 'video'} />
+                      <ChannelCard platform="linkedin" spend={liTotals.spend} applicants={liTotals.conversions} clicks={liTotals.clicks} impressions={liTotals.impressions} thruplays={liTotals.thruplays ?? 0}
+                        isWinner={effectiveObjective === 'video' ? liVideoWins : (effectiveObjective === 'impressies' || effectiveObjective === 'verkeer') ? liCpmWins : liWins}
+                        objective={effectiveObjective} />
+                      <ChannelCard platform="meta"     spend={meTotals.spend} applicants={meTotals.conversions} clicks={meTotals.clicks} impressions={meTotals.impressions} thruplays={meTotals.thruplays ?? 0}
+                        isWinner={effectiveObjective === 'video' ? meVideoWins : (effectiveObjective === 'impressies' || effectiveObjective === 'verkeer') ? meCpmWins : meWins}
+                        objective={effectiveObjective} />
+                      <ChannelCard platform="google"   spend={goTotals.spend} applicants={goTotals.conversions} clicks={goTotals.clicks} impressions={goTotals.impressions} thruplays={goTotals.thruplays ?? 0}
+                        isWinner={effectiveObjective === 'video' ? goVideoWins : (effectiveObjective === 'impressies' || effectiveObjective === 'verkeer') ? goCpmWins : goWins}
+                        objective={effectiveObjective} />
                     </>
                   )}
                 </div>
