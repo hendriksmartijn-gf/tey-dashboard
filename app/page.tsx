@@ -898,10 +898,13 @@ export default function DashboardPage() {
                 )}
               </section>
 
-              {/* Campaign ranking */}
+              {/* Campaign table */}
               <section>
                 <h2 className="gf-eyebrow mb-5">Campagnes</h2>
-                {loading ? <CampaignRankTableSkeleton /> : <CampaignRankTable rows={filteredRows} />}
+                {loading
+                  ? <CampaignRankTableSkeleton />
+                  : <CampaignRankTable rows={filteredRows} objective={effectiveObjective} />
+                }
               </section>
 
               {/* Pacing table */}
