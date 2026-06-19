@@ -244,6 +244,25 @@ export default function DashboardPage() {
     return s;
   }, [filtered]);
 
+  // A paid channel with activity (impressions/clicks) but €0 spend means the spend data is
+  // MISSING in the source (e.g. LinkedIn's cost column isn't exported) — not "spent nothing".
+  const spendMissing = useMemo(() => {
+    const agg: Record<Platform, { s: number; a: number }> = {
+      linkedin: { s: 0, a: 0 }, meta: { s: 0, a: 0 }, google: { s: 0, a: 0 },
+    };
+    for (const r of filtered) { agg[r.platform].s += r.spend; agg[r.platform].a += r.impressions + r.clicks; }
+    return {
+      linkedin: agg.linkedin.s === 0 && agg.linkedin.a > 0,
+      meta:     agg.meta.s     === 0 && agg.meta.a     > 0,
+      google:   agg.google.s   === 0 && agg.google.a   > 0,
+    } as Record<Platform, boolean>;
+  }, [filtered]);
+
+  const missingSpendChannels = useMemo(
+    () => (['linkedin', 'meta', 'google'] as Platform[]).filter((p) => spendMissing[p]),
+    [spendMissing],
+  );
+
   // Real completed applications (Recruitee via GA4) grouped by channel.
   const realCompletions = useMemo(() => {
     const c: Record<Channel, number> = { linkedin: 0, meta: 0, google: 0, other: 0 };
@@ -316,10 +335,10 @@ export default function DashboardPage() {
   // conversions to qualify, so a single cheap conversion can't crown a channel that barely ran.
   const convMinVolume = Math.max(3, totals.conversions * 0.1);
   const cpaQualified  = [
-    { name: 'LinkedIn',   cpa: liCpa, vol: liTotals.conversions },
-    { name: 'Meta',       cpa: meCpa, vol: meTotals.conversions },
-    { name: 'Google Ads', cpa: goCpa, vol: goTotals.conversions },
-  ].filter((c) => c.cpa !== null && c.vol >= convMinVolume);
+    { name: 'LinkedIn',   cpa: liCpa, vol: liTotals.conversions, missing: spendMissing.linkedin },
+    { name: 'Meta',       cpa: meCpa, vol: meTotals.conversions, missing: spendMissing.meta },
+    { name: 'Google Ads', cpa: goCpa, vol: goTotals.conversions, missing: spendMissing.google },
+  ].filter((c) => c.cpa !== null && c.vol >= convMinVolume && !c.missing);
   const cpaWinner   = cpaQualified.sort((a, b) => (a.cpa! - b.cpa!))[0] ?? null;
   const minCpa      = cpaWinner?.cpa ?? Math.min(...[liCpa, meCpa, goCpa].filter((c): c is number => c !== null));
   const liWins      = cpaWinner?.name === 'LinkedIn';
@@ -329,16 +348,16 @@ export default function DashboardPage() {
 
   // CPCV winners (video)
   const cpvMin       = Math.min(...[liCpv, meCpv, goCpv].filter((c): c is number => c !== null));
-  const liVideoWins  = liCpv !== null && liCpv === cpvMin;
-  const meVideoWins  = meCpv !== null && meCpv === cpvMin && !liVideoWins;
-  const goVideoWins  = goCpv !== null && goCpv === cpvMin && !liVideoWins && !meVideoWins;
+  const liVideoWins  = liCpv !== null && liCpv === cpvMin && !spendMissing.linkedin;
+  const meVideoWins  = meCpv !== null && meCpv === cpvMin && !liVideoWins && !spendMissing.meta;
+  const goVideoWins  = goCpv !== null && goCpv === cpvMin && !liVideoWins && !meVideoWins && !spendMissing.google;
   const bestVideoChannel = liVideoWins ? 'LinkedIn' : meVideoWins ? 'Meta' : goVideoWins ? 'Google Ads' : '—';
 
   // CPM winners (impressies/verkeer)
   const cpmMin      = Math.min(...[liCpm, meCpm, goCpm].filter(Boolean));
-  const liCpmWins   = liCpm > 0 && liCpm === cpmMin;
-  const meCpmWins   = meCpm > 0 && meCpm === cpmMin && !liCpmWins;
-  const goCpmWins   = goCpm > 0 && goCpm === cpmMin && !liCpmWins && !meCpmWins;
+  const liCpmWins   = liCpm > 0 && liCpm === cpmMin && !spendMissing.linkedin;
+  const meCpmWins   = meCpm > 0 && meCpm === cpmMin && !liCpmWins && !spendMissing.meta;
+  const goCpmWins   = goCpm > 0 && goCpm === cpmMin && !liCpmWins && !meCpmWins && !spendMissing.google;
   const bestCpmChannel = liCpmWins ? 'LinkedIn' : meCpmWins ? 'Meta' : goCpmWins ? 'Google Ads' : '—';
 
   // Previous period computation
@@ -556,6 +575,15 @@ export default function DashboardPage() {
         { label: convLabel, li: fmtNum(liTotals.conversions),                              me: fmtNum(meTotals.conversions),                              go: fmtNum(goTotals.conversions),                              liR: liTotals.conversions,  meR: meTotals.conversions,  goR: goTotals.conversions },
         { label: cpaLabel,  li: liCpa != null ? fmtEur(liCpa) : '—',                      me: meCpa != null ? fmtEur(meCpa) : '—',                      go: goCpa != null ? fmtEur(goCpa) : '—',                      liR: liCpa ?? 0,            meR: meCpa ?? 0,            goR: goCpa ?? 0,            lower: true },
       );
+    }
+    // For monetary rows (budget + cost metrics), show "ontbreekt" instead of €0 when a
+    // channel's spend is missing in the source.
+    for (const row of tableRows) {
+      const monetary = row.lower || row.label === 'Budget';
+      if (!monetary) continue;
+      if (spendMissing.linkedin) row.li = 'ontbreekt';
+      if (spendMissing.meta)     row.me = 'ontbreekt';
+      if (spendMissing.google)   row.go = 'ontbreekt';
     }
     return tableRows;
   })();
@@ -784,6 +812,18 @@ export default function DashboardPage() {
             />
             <div style={{ flex: 1, minWidth: 0 }} className="space-y-10">
 
+              {/* Missing-spend warning */}
+              {!loading && missingSpendChannels.length > 0 && (
+                <div className="flex items-start gap-3 px-4 py-3 -mb-4" style={{ background: '#FFFBEB', border: '1px solid #FCE7B0', borderRadius: '8px' }}>
+                  <span className="text-base leading-none mt-0.5">⚠</span>
+                  <p className="text-sm" style={{ color: '#8C5A00' }}>
+                    <strong>{missingSpendChannels.map((p) => ({ linkedin: 'LinkedIn', meta: 'Meta', google: 'Google Ads' }[p])).join(', ')}</strong> levert geen advertentiekosten in de bron.
+                    Clicks, impressies en conversies kloppen, maar <strong>spend, CPA en budget ontbreken</strong> voor {missingSpendChannels.length > 1 ? 'deze kanalen' : 'dit kanaal'} —
+                    totalen tellen die spend niet mee. Los op door de cost-metric aan de export toe te voegen.
+                  </p>
+                </div>
+              )}
+
               {/* Top KPIs */}
               <section id="overzicht" className="scroll-mt-[150px]">
                 <h2 className="gf-eyebrow mb-5">Totaaloverzicht</h2>
@@ -885,6 +925,7 @@ export default function DashboardPage() {
                 <RealCpaSection
                   spend={channelSpendFull}
                   completions={realCompletions}
+                  missing={{ linkedin: spendMissing.linkedin, meta: spendMissing.meta, google: spendMissing.google }}
                   loading={analyticsLoading}
                   available={analytics !== null}
                 />
@@ -900,13 +941,13 @@ export default function DashboardPage() {
                     <>
                       <ChannelCard platform="linkedin" spend={liTotals.spend} applicants={liTotals.conversions} clicks={liTotals.clicks} impressions={liTotals.impressions} thruplays={liTotals.thruplays ?? 0}
                         isWinner={effectiveObjective === 'video' ? liVideoWins : (effectiveObjective === 'impressies' || effectiveObjective === 'verkeer') ? liCpmWins : liWins}
-                        objective={effectiveObjective} />
+                        objective={effectiveObjective} spendMissing={spendMissing.linkedin} />
                       <ChannelCard platform="meta"     spend={meTotals.spend} applicants={meTotals.conversions} clicks={meTotals.clicks} impressions={meTotals.impressions} thruplays={meTotals.thruplays ?? 0}
                         isWinner={effectiveObjective === 'video' ? meVideoWins : (effectiveObjective === 'impressies' || effectiveObjective === 'verkeer') ? meCpmWins : meWins}
-                        objective={effectiveObjective} />
+                        objective={effectiveObjective} spendMissing={spendMissing.meta} />
                       <ChannelCard platform="google"   spend={goTotals.spend} applicants={goTotals.conversions} clicks={goTotals.clicks} impressions={goTotals.impressions} thruplays={goTotals.thruplays ?? 0}
                         isWinner={effectiveObjective === 'video' ? goVideoWins : (effectiveObjective === 'impressies' || effectiveObjective === 'verkeer') ? goCpmWins : goWins}
-                        objective={effectiveObjective} />
+                        objective={effectiveObjective} spendMissing={spendMissing.google} />
                     </>
                   )}
                 </div>
@@ -1023,7 +1064,11 @@ export default function DashboardPage() {
         {/* TAB: SOLLICITATIES                                         */}
         {/* ══════════════════════════════════════════════════════════ */}
         {tab === 'sollicitaties' && (
-          <SollicitatiesSection dateFrom={dateFrom} dateTo={dateTo} channelSpend={channelSpendFull} />
+          <SollicitatiesSection
+            dateFrom={dateFrom} dateTo={dateTo}
+            channelSpend={channelSpendFull}
+            spendMissing={{ linkedin: spendMissing.linkedin, meta: spendMissing.meta, google: spendMissing.google }}
+          />
         )}
 
         {/* ══════════════════════════════════════════════════════════ */}

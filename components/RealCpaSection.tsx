@@ -8,6 +8,8 @@ interface Props {
   spend:       Record<'linkedin' | 'meta' | 'google', number>;
   /** Completed applications (Recruitee, via GA4) per channel for the selected period. */
   completions: Record<Channel, number>;
+  /** Channels whose spend is missing in the source (not "spent nothing"). */
+  missing?:    Record<'linkedin' | 'meta' | 'google', boolean>;
   loading:     boolean;
   available:   boolean;
 }
@@ -31,7 +33,8 @@ export function RealCpaSectionSkeleton() {
   );
 }
 
-export default function RealCpaSection({ spend, completions, loading, available }: Props) {
+export default function RealCpaSection({ spend, completions, missing, loading, available }: Props) {
+  const isMissing = (ch: 'linkedin' | 'meta' | 'google') => missing?.[ch] ?? false;
   if (loading) return <RealCpaSectionSkeleton />;
 
   if (!available) {
@@ -56,7 +59,8 @@ export default function RealCpaSection({ spend, completions, loading, available 
   const totalCpa = attributableCompletions > 0 ? paidSpend / attributableCompletions : null;
 
   // Channels that have applications but no spend in the window — surfaced as a caveat.
-  const orphanChannels = PAID.filter((ch) => completions[ch] > 0 && spend[ch] === 0);
+  // Exclude channels whose spend is missing entirely (different problem, shown elsewhere).
+  const orphanChannels = PAID.filter((ch) => completions[ch] > 0 && spend[ch] === 0 && !isMissing(ch));
 
   // Cheapest qualifying channel (real spend AND completions) for highlighting.
   const cheapest = PAID
@@ -88,7 +92,8 @@ export default function RealCpaSection({ spend, completions, loading, available 
         {/* Per channel */}
         {PAID.map((ch, idx) => {
           const cpa     = cpaFor(ch);
-          const noSpend = completions[ch] > 0 && spend[ch] === 0;
+          const missingSpend = isMissing(ch);
+          const noSpend = !missingSpend && completions[ch] > 0 && spend[ch] === 0;
           const isCheap = ch === cheapest && cpa !== null;
           return (
             <div
@@ -112,10 +117,12 @@ export default function RealCpaSection({ spend, completions, loading, available 
                 )}
               </div>
               <p className="gf-display text-[1.9rem] font-light tabular-nums" style={{ color: isCheap ? '#16A34A' : '#12101F' }}>
-                {cpa !== null ? fmtEur2(cpa) : '—'}
+                {missingSpend ? 'ontbreekt' : cpa !== null ? fmtEur2(cpa) : '—'}
               </p>
-              <p className="text-xs mt-1.5" style={{ color: noSpend ? '#F59E0B' : '#8C9BAF' }}>
-                {noSpend
+              <p className="text-xs mt-1.5" style={{ color: missingSpend || noSpend ? '#F59E0B' : '#8C9BAF' }}>
+                {missingSpend
+                  ? `spend ontbreekt in bron · ${fmtNum(completions[ch])} soll.`
+                  : noSpend
                   ? `${fmtNum(completions[ch])} soll. zonder spend in periode`
                   : `${fmtEur0(spend[ch])} ÷ ${fmtNum(completions[ch])} soll.`}
               </p>

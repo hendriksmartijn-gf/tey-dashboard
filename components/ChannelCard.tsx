@@ -9,6 +9,7 @@ interface Props {
   thruplays?:  number;
   isWinner:    boolean;
   objective?:  Objective;
+  spendMissing?: boolean;
 }
 
 const fmtEur = (n: number) =>
@@ -52,9 +53,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export default function ChannelCard({
   platform, spend, applicants, clicks, impressions,
-  thruplays = 0, isWinner, objective,
+  thruplays = 0, isWinner, objective, spendMissing = false,
 }: Props) {
   const cfg = CONFIG[platform];
+  const MISSING = 'ontbreekt';
 
   // Computed metrics
   const cpa = applicants  > 0 ? spend / applicants  : null;
@@ -74,7 +76,8 @@ export default function ChannelCard({
                   : isImpressies ? 'Kosten per 1000 impressies (CPM)'
                   : isLeads      ? 'Kosten per lead (CPL)'
                   :                'Kosten per sollicitant';
-  const heroValue = isVideo      ? (cpv !== null ? fmtEur2(cpv) : '—')
+  const heroValue = spendMissing  ? MISSING
+                  : isVideo      ? (cpv !== null ? fmtEur2(cpv) : '—')
                   : isImpressies ? (cpm !== null ? fmtEur2(cpm) : '—')
                   : (cpa !== null ? fmtEur2(cpa) : '—');
 
@@ -88,13 +91,13 @@ export default function ChannelCard({
     <div
       className="bg-white rounded-lg p-6 relative"
       style={{
-        border: `1px solid ${isWinner ? '#16A34A' : '#DCE0E6'}`,
-        boxShadow: isWinner
+        border: `1px solid ${isWinner && !spendMissing ? '#16A34A' : '#DCE0E6'}`,
+        boxShadow: isWinner && !spendMissing
           ? '0 8px 24px rgba(18,16,34,0.08), 0 0 0 1px #16A34A'
           : '0 8px 24px rgba(18,16,34,0.08)',
       }}
     >
-      {isWinner && (
+      {isWinner && !spendMissing && (
         <span
           className="absolute top-4 right-4 text-xs font-bold px-2 py-0.5 rounded"
           style={{ background: '#DCFCE7', color: '#16A34A' }}
@@ -118,21 +121,21 @@ export default function ChannelCard({
       <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-4 border-t border-[#DCE0E6]">
         {isVideo ? (
           <>
-            <Stat label="Budget gespendeerd"  value={fmtEur(spend)} />
+            <Stat label="Budget gespendeerd"  value={spendMissing ? MISSING : fmtEur(spend)} />
             <Stat label="Completed views"     value={thruplays > 0 ? fmtNum(thruplays) : '—'} />
             <Stat label="Impressies"          value={fmtNum(impressions)} />
             <Stat label="VTR"                 value={vtr > 0 ? fmtPct(vtr) : '—'} />
           </>
         ) : isImpressies ? (
           <>
-            <Stat label="Budget gespendeerd"  value={fmtEur(spend)} />
+            <Stat label="Budget gespendeerd"  value={spendMissing ? MISSING : fmtEur(spend)} />
             <Stat label="Impressies"          value={fmtNum(impressions)} />
             <Stat label="Clicks"              value={fmtNum(clicks)} />
             <Stat label="CTR"                 value={fmtPct(ctr)} />
           </>
         ) : (
           <>
-            <Stat label="Budget gespendeerd"  value={fmtEur(spend)} />
+            <Stat label="Budget gespendeerd"  value={spendMissing ? MISSING : fmtEur(spend)} />
             <Stat label={isLeads ? 'Leads' : 'Sollicitanten'} value={fmtNum(applicants)} />
             <Stat label="CTR"                 value={fmtPct(ctr)} />
             <Stat label="Kosten per klik"     value={cpc > 0 ? fmtEur2(cpc) : '—'} />

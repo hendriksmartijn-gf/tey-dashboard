@@ -179,6 +179,8 @@ interface Props {
   dateTo?:   string;
   /** Paid ad spend per channel for the selected period — to compute cost per completed application. */
   channelSpend?: { linkedin: number; meta: number; google: number };
+  /** Channels whose spend is missing in the source (shown as "ontbreekt"). */
+  spendMissing?: { linkedin: boolean; meta: boolean; google: boolean };
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -194,7 +196,7 @@ function Skeleton() {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function SollicitatiesSection({ dateFrom, dateTo, channelSpend }: Props) {
+export default function SollicitatiesSection({ dateFrom, dateTo, channelSpend, spendMissing }: Props) {
   const [data,    setData]    = useState<AnalyticsSlice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
@@ -349,21 +351,21 @@ export default function SollicitatiesSection({ dateFrom, dateTo, channelSpend }:
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4">
             {([
-              ['Alle kanalen', channelCost.total, channelCost.paidSpend, channelCost.paidComp, '#6331F4', true],
-              ['LinkedIn', channelCost.perChannel.linkedin, channelSpend!.linkedin, channelCost.comp.linkedin, '#0077B5', false],
-              ['Meta', channelCost.perChannel.meta, channelSpend!.meta, channelCost.comp.meta, '#1877F2', false],
-              ['Google Ads', channelCost.perChannel.google, channelSpend!.google, channelCost.comp.google, '#F59E0B', false],
-            ] as [string, number | null, number, number, string, boolean][]).map(([label, cpa, sp, cnt, color, isTotal], i) => (
+              ['Alle kanalen', channelCost.total, channelCost.paidSpend, channelCost.paidComp, '#6331F4', true, false],
+              ['LinkedIn', channelCost.perChannel.linkedin, channelSpend!.linkedin, channelCost.comp.linkedin, '#0077B5', false, spendMissing?.linkedin ?? false],
+              ['Meta', channelCost.perChannel.meta, channelSpend!.meta, channelCost.comp.meta, '#1877F2', false, spendMissing?.meta ?? false],
+              ['Google Ads', channelCost.perChannel.google, channelSpend!.google, channelCost.comp.google, '#F59E0B', false, spendMissing?.google ?? false],
+            ] as [string, number | null, number, number, string, boolean, boolean][]).map(([label, cpa, sp, cnt, color, isTotal, missing], i) => (
               <div key={label} className="p-5" style={{ borderRight: i < 3 ? '1px solid #F0F4F8' : undefined, borderBottom: '1px solid #F0F4F8', background: isTotal ? '#FAFBFF' : undefined }}>
                 <div className="flex items-center gap-1.5 mb-2">
                   {!isTotal && <span className="w-2 h-2 rounded-full" style={{ background: color }} />}
                   <p className="text-xs font-bold uppercase tracking-widest" style={{ color }}>{label}</p>
                 </div>
                 <p className="gf-display text-[1.9rem] font-light tabular-nums" style={{ color: '#12101F' }}>
-                  {cpa !== null ? fmtEur2(cpa) : '—'}
+                  {missing ? 'ontbreekt' : cpa !== null ? fmtEur2(cpa) : '—'}
                 </p>
-                <p className="text-xs mt-1.5" style={{ color: '#8C9BAF' }}>
-                  {fmtEur0(sp)} ÷ {fmtNum(cnt)} soll.
+                <p className="text-xs mt-1.5" style={{ color: missing ? '#F59E0B' : '#8C9BAF' }}>
+                  {missing ? `spend ontbreekt in bron · ${fmtNum(cnt)} soll.` : `${fmtEur0(sp)} ÷ ${fmtNum(cnt)} soll.`}
                 </p>
               </div>
             ))}
