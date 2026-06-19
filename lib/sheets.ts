@@ -135,7 +135,7 @@ function normaliseLinkedIn(rows: string[][]): CampaignRow[] {
   const iDate       = findCol(headers, 'report: date', 'date', 'day', 'start date', 'startdate');
   const iImpr       = findCol(headers, 'performance: impressions', 'impressions', 'impressie', 'views');
   const iClicks     = findCol(headers, 'performance: clicks', 'clicks', 'klikken', 'total clicks');
-  const iSpend      = findCol(headers, 'cost: amount spend in local currency', 'cost: amount spent in local currency', 'amount spent', 'amount spend', 'spent', 'spend', 'cost (local currency)');
+  const iSpend      = findCol(headers, 'cost: amount spend', 'cost: amount spend in local currency', 'cost: amount spent in local currency', 'amount spent', 'amount spend', 'spent', 'spend', 'cost (local currency)');
   const iConv       = findCol(headers, 'performance: conversions', 'conversions', 'leads', 'total conversions');
   const iReach      = findCol(headers, 'performance: reach', 'reach', 'bereik');
   const iThruplays  = findCol(headers, 'video: plays at 100%', 'video: plays at 100', 'thruplays', 'thruplay');

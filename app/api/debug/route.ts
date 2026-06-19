@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import { JWT } from 'google-auth-library';
-import { getRawSheetData } from '@/lib/sheets';
+import { getRawSheetData, getCampaigns } from '@/lib/sheets';
+import type { Platform } from '@/types/campaign';
 
 // Development-only — returns raw headers, sample rows, and lists all tab names
 // in the spreadsheet so you can verify the exact tab names.
@@ -34,9 +35,24 @@ export async function GET() {
   try {
     const { linkedin, meta } = await getRawSheetData();
 
+    // Parsed view: how the dashboard actually normalises the rows, per platform.
+    // This pinpoints whether e.g. LinkedIn spend reads as 0.
+    const campaigns = await getCampaigns();
+    const byPlatform: Record<Platform, { rows: number; spend: number; conversions: number; impressions: number; minDate: string; maxDate: string }> =
+      { linkedin: { rows: 0, spend: 0, conversions: 0, impressions: 0, minDate: '', maxDate: '' },
+        meta:     { rows: 0, spend: 0, conversions: 0, impressions: 0, minDate: '', maxDate: '' },
+        google:   { rows: 0, spend: 0, conversions: 0, impressions: 0, minDate: '', maxDate: '' } };
+    for (const r of campaigns) {
+      const p = byPlatform[r.platform];
+      p.rows += 1; p.spend += r.spend; p.conversions += r.conversions; p.impressions += r.impressions;
+      if (r.date && (!p.minDate || r.date < p.minDate)) p.minDate = r.date;
+      if (r.date && (!p.maxDate || r.date > p.maxDate)) p.maxDate = r.date;
+    }
+
     return NextResponse.json({
       spreadsheet_id: sheetId,
       actual_tab_names: tabNames,
+      parsed_totals: byPlatform,
       linkedin: {
         headers: linkedin[0] ?? [],
         sample: linkedin.slice(1, 21),
