@@ -7,6 +7,10 @@ import CampaignRankTable, { CampaignRankTableSkeleton } from '@/components/Campa
 import CpaTrendChart, { CpaTrendChartSkeleton } from '@/components/CpaTrendChart';
 import PacingTable, { PacingTableSkeleton } from '@/components/PacingTable';
 import DailyDeliveryChart, { DailyDeliveryChartSkeleton } from '@/components/DailyDeliveryChart';
+import RealCpaSection from '@/components/RealCpaSection';
+import AttentionPanel from '@/components/AttentionPanel';
+import { sourceToChannel, type Channel } from '@/lib/channel';
+import type { ConversionBySource, ConversionByJob, ApplicationStart } from '@/lib/analytics';
 import AnalyticsSection from '@/components/AnalyticsSection';
 import SollicitatiesSection from '@/components/SollicitatiesSection';
 import GoogleAdsWrapper from '@/components/GoogleAdsWrapper';
@@ -61,55 +65,19 @@ function presetRange(preset: Preset, customFrom: string, customTo: string) {
   return { from: fmt(start), to };
 }
 
-// ── Platform config ───────────────────────────────────────────────────────────
-const PLATFORM_COLOR: Record<Platform, string> = {
-  linkedin: '#0077B5',
-  meta:     '#1877F2',
-  google:   '#F59E0B',
-};
-const PLATFORM_LABEL: Record<Platform, string> = {
-  linkedin: 'LinkedIn',
-  meta:     'Meta',
-  google:   'Google Ads',
-};
-
-// ── Spotlight card ────────────────────────────────────────────────────────────
-interface SpotlightCardProps {
-  badge: string;
-  badgeColor: string;
-  title: string;
-  campaignName: string;
-  platform: Platform;
-  metric: string;
-  metricLabel: string;
-}
-function SpotlightCard({ badge, badgeColor, title, campaignName, platform, metric, metricLabel }: SpotlightCardProps) {
-  return (
-    <div className="bg-white p-5" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
-      <div className="flex items-center gap-2 mb-3">
-        <span className="text-base">{badge}</span>
-        <span className="text-xs font-bold uppercase tracking-widest" style={{ color: badgeColor }}>{title}</span>
-      </div>
-      <p className="text-base font-semibold leading-snug mb-3 truncate" title={campaignName} style={{ color: '#12101F' }}>
-        {campaignName}
-      </p>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-bold px-2 py-0.5 text-white" style={{ background: PLATFORM_COLOR[platform], borderRadius: '4px' }}>
-          {PLATFORM_LABEL[platform]}
-        </span>
-        <span className="text-xs" style={{ color: '#8C9BAF' }}>
-          {metricLabel}: <span className="font-bold" style={{ color: '#12101F' }}>{metric}</span>
-        </span>
-      </div>
-    </div>
-  );
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const [rows,    setRows]    = useState<CampaignRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
+
+  // Real applications (GA4 / Recruitee) for the selected period — channel-attributed.
+  const [analytics, setAnalytics] = useState<{
+    conversionsBySource: ConversionBySource[];
+    conversionsByJob:    ConversionByJob[];
+    applicationStarts:   ApplicationStart[];
+  } | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
 
   // Navigation
   const [tab,        setTab]        = useState<Tab>('ads');
@@ -173,6 +141,19 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Fetch real applications (GA4) for the selected period. Re-runs when the period changes.
+  useEffect(() => {
+    if (!dateFrom || !dateTo) return;
+    let cancelled = false;
+    setAnalyticsLoading(true);
+    fetch(`/api/analytics?startDate=${dateFrom}&endDate=${dateTo}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled) setAnalytics(d); })
+      .catch(() => { if (!cancelled) setAnalytics(null); })
+      .finally(() => { if (!cancelled) setAnalyticsLoading(false); });
+    return () => { cancelled = true; };
+  }, [dateFrom, dateTo]);
 
   // Running campaigns = recent activity in last 7 days of available data.
   // Robust to data lag: uses dataset max date, not wall-clock today.
@@ -244,6 +225,56 @@ export default function DashboardPage() {
     [filtered, selectedCampaigns],
   );
 
+  // Most recent date present in the dataset — used as the "data through" freshness marker.
+  const datasetMax = useMemo(() => {
+    let max = '';
+    for (const r of rows) if (r.date > max) max = r.date;
+    return max;
+  }, [rows]);
+
+  // Full channel spend for the period (ALL campaigns — not campaign-filtered), to pair with
+  // channel-level GA4 completions for a true cost-per-application.
+  const channelSpendFull = useMemo(() => {
+    const s = { linkedin: 0, meta: 0, google: 0 };
+    for (const r of filtered) {
+      if (r.platform === 'linkedin') s.linkedin += r.spend;
+      else if (r.platform === 'meta') s.meta += r.spend;
+      else s.google += r.spend;
+    }
+    return s;
+  }, [filtered]);
+
+  // Real completed applications (Recruitee via GA4) grouped by channel.
+  const realCompletions = useMemo(() => {
+    const c: Record<Channel, number> = { linkedin: 0, meta: 0, google: 0, other: 0 };
+    for (const r of analytics?.conversionsBySource ?? []) {
+      c[sourceToChannel(r.source)] += r.completions;
+    }
+    return c;
+  }, [analytics]);
+
+  // Worst funnel drop-off vacancy (starts vs completions) for the attention panel.
+  const worstDropoff = useMemo(() => {
+    if (!analytics) return null;
+    const startsMap = new Map<string, number>();
+    for (const r of analytics.applicationStarts) {
+      startsMap.set(r.jobTitle, (startsMap.get(r.jobTitle) ?? 0) + r.starts);
+    }
+    const compMap = new Map<string, number>();
+    for (const r of analytics.conversionsByJob) {
+      compMap.set(r.jobTitle, (compMap.get(r.jobTitle) ?? 0) + r.completions);
+    }
+    let worst: { jobTitle: string; starts: number; completed: number } | null = null;
+    let worstRate = 0;
+    for (const [job, starts] of startsMap) {
+      if (starts < 10) continue; // need volume to be meaningful
+      const completed = compMap.get(job) ?? 0;
+      const rate = 1 - completed / starts;
+      if (rate > worstRate) { worstRate = rate; worst = { jobTitle: job, starts, completed }; }
+    }
+    return worst;
+  }, [analytics]);
+
   // Totals
   const totals     = useMemo(() => sumRows(filteredRows), [filteredRows]);
   const overallCpa = totals.conversions > 0 ? totals.spend / totals.conversions : null;
@@ -281,13 +312,20 @@ export default function DashboardPage() {
 
   // ── Winner logic per objective ──────────────────────────────────────────────
 
-  // CPA winners (conversies/leads)
-  const cpas    = [liCpa, meCpa, goCpa];
-  const minCpa  = Math.min(...cpas.filter((c): c is number => c !== null));
-  const liWins  = liCpa !== null && liCpa === minCpa;
-  const meWins  = meCpa !== null && meCpa === minCpa && !liWins;
-  const goWins  = goCpa !== null && goCpa === minCpa && !liWins && !meWins;
-  const bestChannel = liWins ? 'LinkedIn' : meWins ? 'Meta' : goWins ? 'Google Ads' : '—';
+  // CPA winners (conversies/leads) — volume-aware: a channel must carry a meaningful share of
+  // conversions to qualify, so a single cheap conversion can't crown a channel that barely ran.
+  const convMinVolume = Math.max(3, totals.conversions * 0.1);
+  const cpaQualified  = [
+    { name: 'LinkedIn',   cpa: liCpa, vol: liTotals.conversions },
+    { name: 'Meta',       cpa: meCpa, vol: meTotals.conversions },
+    { name: 'Google Ads', cpa: goCpa, vol: goTotals.conversions },
+  ].filter((c) => c.cpa !== null && c.vol >= convMinVolume);
+  const cpaWinner   = cpaQualified.sort((a, b) => (a.cpa! - b.cpa!))[0] ?? null;
+  const minCpa      = cpaWinner?.cpa ?? Math.min(...[liCpa, meCpa, goCpa].filter((c): c is number => c !== null));
+  const liWins      = cpaWinner?.name === 'LinkedIn';
+  const meWins      = cpaWinner?.name === 'Meta';
+  const goWins      = cpaWinner?.name === 'Google Ads';
+  const bestChannel = cpaWinner?.name ?? '—';
 
   // CPCV winners (video)
   const cpvMin       = Math.min(...[liCpv, meCpv, goCpv].filter((c): c is number => c !== null));
@@ -339,6 +377,21 @@ export default function DashboardPage() {
     return (cur - prev) / prev;
   }
 
+  // Previous-period rows for the attention panel — always computed (independent of the
+  // compare toggle) so deterioration signals are available by default.
+  const attentionPrevRows = useMemo(() => {
+    if (!dateFrom || !dateTo) return [] as CampaignRow[];
+    const fromD = new Date(dateFrom + 'T00:00:00');
+    const toD   = new Date(dateTo   + 'T00:00:00');
+    const dur   = toD.getTime() - fromD.getTime();
+    const pTo   = fmt(new Date(fromD.getTime() - 86_400_000));
+    const pFrom = fmt(new Date(fromD.getTime() - 86_400_000 - dur));
+    return rows.filter((r) =>
+      r.date >= pFrom && r.date <= pTo &&
+      (selectedCampaigns.size === 0 || selectedCampaigns.has(r.campaign_name))
+    );
+  }, [rows, dateFrom, dateTo, selectedCampaigns]);
+
   // Objective auto-detection
   const autoObjective = useMemo(() =>
     autoDetectObjective([...selectedCampaigns]),
@@ -384,22 +437,6 @@ export default function DashboardPage() {
 
   const bestCpaCampaign = useMemo(() =>
     [...campaignSummaries].filter((c) => c.applicants > 0).sort((a, b) => a.cpa - b.cpa)[0] ?? null,
-    [campaignSummaries],
-  );
-  const bestCpcCampaign = useMemo(() =>
-    [...campaignSummaries].filter((c) => c.clicks > 0).sort((a, b) => a.cpc - b.cpc)[0] ?? null,
-    [campaignSummaries],
-  );
-  const bestCpcvCampaign = useMemo(() =>
-    [...campaignSummaries].filter((c) => c.thruplays > 0).sort((a, b) => a.cpcv - b.cpcv)[0] ?? null,
-    [campaignSummaries],
-  );
-  const bestVtrCampaign = useMemo(() =>
-    [...campaignSummaries].filter((c) => c.impressions > 0 && c.thruplays > 0).sort((a, b) => b.vtr - a.vtr)[0] ?? null,
-    [campaignSummaries],
-  );
-  const bestCpmCampaign = useMemo(() =>
-    [...campaignSummaries].filter((c) => c.impressions > 0).sort((a, b) => a.cpm - b.cpm)[0] ?? null,
     [campaignSummaries],
   );
 
@@ -665,7 +702,47 @@ export default function DashboardPage() {
                 vs. {prevFrom} – {prevTo}
               </span>
             )}
+
+            {/* Data freshness */}
+            {datasetMax && (
+              <span
+                className="text-xs ml-auto flex items-center gap-1.5"
+                style={{ color: '#8C9BAF' }}
+                title="Meest recente dag met advertentiedata in de bron"
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#16A34A' }} />
+                Data t/m {new Date(datasetMax + 'T00:00:00').toLocaleDateString('nl-NL', { day: 'numeric', month: 'short' })}
+              </span>
+            )}
           </div>
+
+          {/* In-tab section navigation (Advertenties only) */}
+          {tab === 'ads' && (
+            <div className="flex items-center gap-1.5 pb-3 overflow-x-auto">
+              {([
+                ['overzicht',    'Overzicht'],
+                ['echte-kosten', 'Echte kosten'],
+                ['kanalen',      'Kanalen'],
+                ['trend',        'Trend'],
+                ['aandacht',     'Aandacht'],
+                ['campagnes',    'Campagnes'],
+                ['uitlevering',  'Uitlevering'],
+                ['pacing',       'Pacing'],
+                ['google',       'Google Ads'],
+              ] as [string, string][]).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  className="text-xs font-semibold px-2.5 py-1 whitespace-nowrap transition-colors"
+                  style={{ borderRadius: '4px', background: '#F0F4F8', color: '#555E6C' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = '#6331F414'; e.currentTarget.style.color = '#6331F4'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = '#F0F4F8'; e.currentTarget.style.color = '#555E6C'; }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
         </div>
       </div>
@@ -708,7 +785,7 @@ export default function DashboardPage() {
             <div style={{ flex: 1, minWidth: 0 }} className="space-y-10">
 
               {/* Top KPIs */}
-              <section>
+              <section id="overzicht" className="scroll-mt-[150px]">
                 <h2 className="gf-eyebrow mb-5">Totaaloverzicht</h2>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {loading ? (
@@ -802,8 +879,19 @@ export default function DashboardPage() {
                 </div>
               </section>
 
+              {/* Real cost per completed application (GA4 / Recruitee) */}
+              <section id="echte-kosten" className="scroll-mt-[150px]">
+                <h2 className="gf-eyebrow mb-5">Echte kosten per sollicitatie</h2>
+                <RealCpaSection
+                  spend={channelSpendFull}
+                  completions={realCompletions}
+                  loading={analyticsLoading}
+                  available={analytics !== null}
+                />
+              </section>
+
               {/* Channel comparison */}
-              <section>
+              <section id="kanalen" className="scroll-mt-[150px]">
                 <h2 className="gf-eyebrow mb-5">Kanaalvergelijking</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   {loading ? (
@@ -862,7 +950,7 @@ export default function DashboardPage() {
               </section>
 
               {/* Trend line – metric auto-adapts to objective, platforms toggleable */}
-              <section>
+              <section id="trend" className="scroll-mt-[150px]">
                 <h2 className="gf-eyebrow mb-5">Trendlijn per dag</h2>
                 {loading
                   ? <CpaTrendChartSkeleton />
@@ -870,62 +958,23 @@ export default function DashboardPage() {
                 }
               </section>
 
-              {/* Uitschieters – objective-aware */}
-              <section>
-                <h2 className="gf-eyebrow mb-5">Uitschieters</h2>
+              {/* Wat vraagt aandacht – problemen & bijstuur-signalen */}
+              <section id="aandacht" className="scroll-mt-[150px]">
+                <h2 className="gf-eyebrow mb-5">Wat vraagt aandacht</h2>
                 {loading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <KpiCardSkeleton /><KpiCardSkeleton />
-                  </div>
+                  <div className="bg-white rounded-lg animate-pulse" style={{ border: '1px solid #DCE0E6', height: '220px' }} />
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {effectiveObjective === 'video' ? (
-                      <>
-                        {bestCpcvCampaign ? (
-                          <SpotlightCard badge="🏆" badgeColor="#16A34A" title="Laagste CPCV" campaignName={bestCpcvCampaign.campaign_name} platform={bestCpcvCampaign.platform} metric={fmtEur(bestCpcvCampaign.cpcv)} metricLabel="CPCV" />
-                        ) : (
-                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen video view data beschikbaar</div>
-                        )}
-                        {bestVtrCampaign ? (
-                          <SpotlightCard badge="▶️" badgeColor="#6331F4" title="Hoogste VTR" campaignName={bestVtrCampaign.campaign_name} platform={bestVtrCampaign.platform} metric={fmtPct(bestVtrCampaign.vtr)} metricLabel="VTR" />
-                        ) : (
-                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen VTR data beschikbaar</div>
-                        )}
-                      </>
-                    ) : effectiveObjective === 'impressies' || effectiveObjective === 'verkeer' ? (
-                      <>
-                        {bestCpmCampaign ? (
-                          <SpotlightCard badge="📡" badgeColor="#16A34A" title="Laagste CPM" campaignName={bestCpmCampaign.campaign_name} platform={bestCpmCampaign.platform} metric={fmtEur(bestCpmCampaign.cpm)} metricLabel="CPM" />
-                        ) : (
-                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen CPM data beschikbaar</div>
-                        )}
-                        {bestCpcCampaign ? (
-                          <SpotlightCard badge="🖱️" badgeColor="#16A34A" title="Laagste CPC" campaignName={bestCpcCampaign.campaign_name} platform={bestCpcCampaign.platform} metric={fmtEur(bestCpcCampaign.cpc)} metricLabel="CPC" />
-                        ) : (
-                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen klikdata beschikbaar</div>
-                        )}
-                      </>
-                    ) : (
-                      /* conversies / leads */
-                      <>
-                        {bestCpaCampaign ? (
-                          <SpotlightCard badge="🏆" badgeColor="#16A34A" title={effectiveObjective === 'leads' ? 'Beste CPL' : 'Beste CPA'} campaignName={bestCpaCampaign.campaign_name} platform={bestCpaCampaign.platform} metric={fmtEur(bestCpaCampaign.cpa)} metricLabel={effectiveObjective === 'leads' ? 'CPL' : 'CPA'} />
-                        ) : (
-                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen conversiedata beschikbaar</div>
-                        )}
-                        {bestCpcCampaign ? (
-                          <SpotlightCard badge="🖱️" badgeColor="#16A34A" title="Laagste CPC" campaignName={bestCpcCampaign.campaign_name} platform={bestCpcCampaign.platform} metric={fmtEur(bestCpcCampaign.cpc)} metricLabel="CPC" />
-                        ) : (
-                          <div className="bg-white rounded-lg p-5 text-sm" style={{ border: '1px solid #DCE0E6', color: '#8C9BAF' }}>Geen klikdata beschikbaar</div>
-                        )}
-                      </>
-                    )}
-                  </div>
+                  <AttentionPanel
+                    rows={filteredRows}
+                    prevRows={attentionPrevRows}
+                    objective={effectiveObjective}
+                    vacancyDropoff={worstDropoff}
+                  />
                 )}
               </section>
 
               {/* Campaign table */}
-              <section>
+              <section id="campagnes" className="scroll-mt-[150px]">
                 <h2 className="gf-eyebrow mb-5">Campagnes</h2>
                 {loading
                   ? <CampaignRankTableSkeleton />
@@ -934,7 +983,7 @@ export default function DashboardPage() {
               </section>
 
               {/* Daily delivery per campaign */}
-              <section>
+              <section id="uitlevering" className="scroll-mt-[150px]">
                 <h2 className="gf-eyebrow mb-5">Dagelijkse uitlevering per campagne</h2>
                 {loading
                   ? <DailyDeliveryChartSkeleton />
@@ -946,7 +995,7 @@ export default function DashboardPage() {
               </section>
 
               {/* Pacing table */}
-              <section>
+              <section id="pacing" className="scroll-mt-[150px]">
                 <h2 className="gf-eyebrow mb-5">Pacing</h2>
                 {loading
                   ? <PacingTableSkeleton />
@@ -955,7 +1004,7 @@ export default function DashboardPage() {
               </section>
 
               {/* Google Ads (GA4-attributed) */}
-              <section>
+              <section id="google" className="scroll-mt-[150px]">
                 <h2 className="gf-eyebrow mb-5">Google Ads — GA4</h2>
                 <GoogleAdsWrapper dateFrom={dateFrom} dateTo={dateTo} />
               </section>
@@ -975,7 +1024,7 @@ export default function DashboardPage() {
         {/* TAB: SOLLICITATIES                                         */}
         {/* ══════════════════════════════════════════════════════════ */}
         {tab === 'sollicitaties' && (
-          <SollicitatiesSection dateFrom={dateFrom} dateTo={dateTo} />
+          <SollicitatiesSection dateFrom={dateFrom} dateTo={dateTo} channelSpend={channelSpendFull} />
         )}
 
         {/* ══════════════════════════════════════════════════════════ */}

@@ -5,7 +5,9 @@ import type { ConversionByJob, ApplicationStart } from '@/lib/analytics';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const fmtNum = (n: number) => n.toLocaleString('nl-NL');
+const fmtNum  = (n: number) => n.toLocaleString('nl-NL');
+const fmtEur0 = (n: number) => n.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
+const fmtEur2 = (n: number) => n.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 // Normalize a GA4 page title to the canonical vacancy name.
 // GA4 uses different page titles per stage:
@@ -175,6 +177,8 @@ interface AnalyticsSlice {
 interface Props {
   dateFrom?: string;
   dateTo?:   string;
+  /** Paid ad spend per channel for the selected period — to compute cost per completed application. */
+  channelSpend?: { linkedin: number; meta: number; google: number };
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -190,7 +194,7 @@ function Skeleton() {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function SollicitatiesSection({ dateFrom, dateTo }: Props) {
+export default function SollicitatiesSection({ dateFrom, dateTo, channelSpend }: Props) {
   const [data,    setData]    = useState<AnalyticsSlice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState<string | null>(null);
@@ -276,6 +280,26 @@ export default function SollicitatiesSection({ dateFrom, dateTo }: Props) {
       .sort((a, b) => b.completed - a.completed || b.starts - a.starts);
   }, [data, selectedTitles]);
 
+  // Cost per completed application, per channel. Completions are summed across ALL vacancies
+  // (not the vacancy filter) because the ad spend is account-level, not vacancy-level.
+  const channelCost = useMemo(() => {
+    if (!data || !channelSpend) return null;
+    const comp = { linkedin: 0, meta: 0, google: 0, other: 0 };
+    for (const r of data.conversionsByJob) comp[sourceToChannel(r.source)] += r.completions;
+    const paidSpend = channelSpend.linkedin + channelSpend.meta + channelSpend.google;
+    const paidComp  = comp.linkedin + comp.meta + comp.google;
+    return {
+      comp,
+      total: paidComp > 0 ? paidSpend / paidComp : null,
+      perChannel: {
+        linkedin: comp.linkedin > 0 ? channelSpend.linkedin / comp.linkedin : null,
+        meta:     comp.meta     > 0 ? channelSpend.meta     / comp.meta     : null,
+        google:   comp.google   > 0 ? channelSpend.google   / comp.google   : null,
+      },
+      paidSpend, paidComp,
+    };
+  }, [data, channelSpend]);
+
   // Overall funnel
   const funnel = useMemo(() => {
     const starts    = jobRows.reduce((s, r) => s + r.starts, 0);
@@ -306,6 +330,44 @@ export default function SollicitatiesSection({ dateFrom, dateTo }: Props) {
           <span className="text-xs font-semibold" style={{ color: '#6331F4' }}>gefilterd</span>
         )}
       </div>
+
+      {/* ── Kosten per sollicitatie per kanaal ── */}
+      {channelCost && channelCost.paidComp > 0 && (
+        <div className="bg-white overflow-hidden" style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}>
+          <div className="px-5 py-4 flex items-baseline justify-between gap-3 flex-wrap" style={{ borderBottom: '1px solid #DCE0E6' }}>
+            <span className="gf-eyebrow">Kosten per voltooide sollicitatie</span>
+            <span className="text-xs" style={{ color: '#BCC4CF' }}>
+              advertentiekosten ÷ voltooide sollicitaties (Recruitee) — kanaalniveau, alle vacatures
+            </span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4">
+            {([
+              ['Alle kanalen', channelCost.total, channelCost.paidSpend, channelCost.paidComp, '#6331F4', true],
+              ['LinkedIn', channelCost.perChannel.linkedin, channelSpend!.linkedin, channelCost.comp.linkedin, '#0077B5', false],
+              ['Meta', channelCost.perChannel.meta, channelSpend!.meta, channelCost.comp.meta, '#1877F2', false],
+              ['Google Ads', channelCost.perChannel.google, channelSpend!.google, channelCost.comp.google, '#F59E0B', false],
+            ] as [string, number | null, number, number, string, boolean][]).map(([label, cpa, sp, cnt, color, isTotal], i) => (
+              <div key={label} className="p-5" style={{ borderRight: i < 3 ? '1px solid #F0F4F8' : undefined, borderBottom: '1px solid #F0F4F8', background: isTotal ? '#FAFBFF' : undefined }}>
+                <div className="flex items-center gap-1.5 mb-2">
+                  {!isTotal && <span className="w-2 h-2 rounded-full" style={{ background: color }} />}
+                  <p className="text-xs font-bold uppercase tracking-widest" style={{ color }}>{label}</p>
+                </div>
+                <p className="gf-display text-[1.9rem] font-light tabular-nums" style={{ color: '#12101F' }}>
+                  {cpa !== null ? fmtEur2(cpa) : '—'}
+                </p>
+                <p className="text-xs mt-1.5" style={{ color: '#8C9BAF' }}>
+                  {fmtEur0(sp)} ÷ {fmtNum(cnt)} soll.
+                </p>
+              </div>
+            ))}
+          </div>
+          {channelCost.comp.other > 0 && (
+            <div className="px-5 py-3 text-xs" style={{ background: '#F8FAFC', color: '#8C9BAF' }}>
+              <span className="font-semibold" style={{ color: '#555E6C' }}>{fmtNum(channelCost.comp.other)}</span> sollicitaties via overige/organische bronnen (geen advertentiekosten toegerekend)
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Sollicitatiefunnel ── */}
       {funnel.starts > 0 && (
