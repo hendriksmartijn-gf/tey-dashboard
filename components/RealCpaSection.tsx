@@ -42,16 +42,25 @@ export default function RealCpaSection({ spend, completions, loading, available 
     );
   }
 
-  const paidSpend       = spend.linkedin + spend.meta + spend.google;
-  const paidCompletions = completions.linkedin + completions.meta + completions.google;
-  const totalCpa        = paidCompletions > 0 ? paidSpend / paidCompletions : null;
+  const paidSpend = spend.linkedin + spend.meta + spend.google;
 
-  // Cheapest qualifying channel (>=1 real completion) for highlighting.
-  const cpaByChannel = PAID.map((ch) => ({
-    ch,
-    cpa: completions[ch] > 0 ? spend[ch] / completions[ch] : null,
-  }));
-  const cheapest = cpaByChannel
+  // A cost-per-application is only meaningful when there is BOTH spend and completions in the
+  // window. Channels with completions but €0 spend are an attribution-window mismatch (GA4 credits
+  // a conversion now to a click whose spend fell outside the period) — showing €0 would read as
+  // "free", so we suppress it and exclude those completions from the total denominator.
+  const cpaFor = (ch: 'linkedin' | 'meta' | 'google') =>
+    spend[ch] > 0 && completions[ch] > 0 ? spend[ch] / completions[ch] : null;
+
+  // Total: only count completions from channels that actually had spend in the window.
+  const attributableCompletions = PAID.reduce((a, ch) => a + (spend[ch] > 0 ? completions[ch] : 0), 0);
+  const totalCpa = attributableCompletions > 0 ? paidSpend / attributableCompletions : null;
+
+  // Channels that have applications but no spend in the window — surfaced as a caveat.
+  const orphanChannels = PAID.filter((ch) => completions[ch] > 0 && spend[ch] === 0);
+
+  // Cheapest qualifying channel (real spend AND completions) for highlighting.
+  const cheapest = PAID
+    .map((ch) => ({ ch, cpa: cpaFor(ch) }))
     .filter((c) => c.cpa !== null)
     .sort((a, b) => (a.cpa! - b.cpa!))[0]?.ch;
 
@@ -72,13 +81,14 @@ export default function RealCpaSection({ spend, completions, loading, available 
             {totalCpa !== null ? fmtEur2(totalCpa) : '—'}
           </p>
           <p className="text-xs mt-1.5" style={{ color: '#8C9BAF' }}>
-            {fmtEur0(paidSpend)} ÷ {fmtNum(paidCompletions)} sollicitaties
+            {fmtEur0(paidSpend)} ÷ {fmtNum(attributableCompletions)} sollicitaties
           </p>
         </div>
 
         {/* Per channel */}
         {PAID.map((ch, idx) => {
-          const cpa     = completions[ch] > 0 ? spend[ch] / completions[ch] : null;
+          const cpa     = cpaFor(ch);
+          const noSpend = completions[ch] > 0 && spend[ch] === 0;
           const isCheap = ch === cheapest && cpa !== null;
           return (
             <div
@@ -104,13 +114,26 @@ export default function RealCpaSection({ spend, completions, loading, available 
               <p className="gf-display text-[1.9rem] font-light tabular-nums" style={{ color: isCheap ? '#16A34A' : '#12101F' }}>
                 {cpa !== null ? fmtEur2(cpa) : '—'}
               </p>
-              <p className="text-xs mt-1.5" style={{ color: '#8C9BAF' }}>
-                {fmtEur0(spend[ch])} ÷ {fmtNum(completions[ch])} soll.
+              <p className="text-xs mt-1.5" style={{ color: noSpend ? '#F59E0B' : '#8C9BAF' }}>
+                {noSpend
+                  ? `${fmtNum(completions[ch])} soll. zonder spend in periode`
+                  : `${fmtEur0(spend[ch])} ÷ ${fmtNum(completions[ch])} soll.`}
               </p>
             </div>
           );
         })}
       </div>
+
+      {/* Attribution-window caveat */}
+      {orphanChannels.length > 0 && (
+        <div className="px-5 py-3 flex items-start gap-2 text-xs" style={{ background: '#FFFBEB', color: '#8C5A00' }}>
+          <span className="mt-0.5">⚠</span>
+          <span>
+            {orphanChannels.map((c) => CHANNEL_LABEL[c]).join(', ')} kreeg sollicitaties toegerekend maar had €0 spend in deze periode.
+            Dat is meestal een attributievenster-mismatch (sollicitatie nu, klik/spend eerder) — daarom geen kosten per sollicitatie. Verbreed de periode voor een eerlijk beeld.
+          </span>
+        </div>
+      )}
 
       {/* Organic / other context */}
       {completions.other > 0 && (

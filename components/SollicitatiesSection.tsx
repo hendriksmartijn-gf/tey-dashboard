@@ -287,16 +287,23 @@ export default function SollicitatiesSection({ dateFrom, dateTo, channelSpend }:
     const comp = { linkedin: 0, meta: 0, google: 0, other: 0 };
     for (const r of data.conversionsByJob) comp[sourceToChannel(r.source)] += r.completions;
     const paidSpend = channelSpend.linkedin + channelSpend.meta + channelSpend.google;
-    const paidComp  = comp.linkedin + comp.meta + comp.google;
+    // Only meaningful when a channel had BOTH spend and completions in the window. Completions
+    // without spend = attribution-window mismatch; excluded so the total isn't deflated.
+    const cpaFor = (ch: 'linkedin' | 'meta' | 'google') =>
+      channelSpend[ch] > 0 && comp[ch] > 0 ? channelSpend[ch] / comp[ch] : null;
+    const attributableComp =
+      (channelSpend.linkedin > 0 ? comp.linkedin : 0) +
+      (channelSpend.meta     > 0 ? comp.meta     : 0) +
+      (channelSpend.google   > 0 ? comp.google   : 0);
     return {
       comp,
-      total: paidComp > 0 ? paidSpend / paidComp : null,
+      total: attributableComp > 0 ? paidSpend / attributableComp : null,
       perChannel: {
-        linkedin: comp.linkedin > 0 ? channelSpend.linkedin / comp.linkedin : null,
-        meta:     comp.meta     > 0 ? channelSpend.meta     / comp.meta     : null,
-        google:   comp.google   > 0 ? channelSpend.google   / comp.google   : null,
+        linkedin: cpaFor('linkedin'),
+        meta:     cpaFor('meta'),
+        google:   cpaFor('google'),
       },
-      paidSpend, paidComp,
+      paidSpend, paidComp: attributableComp,
     };
   }, [data, channelSpend]);
 
