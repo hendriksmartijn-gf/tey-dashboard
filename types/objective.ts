@@ -15,6 +15,10 @@ const IMPRESSIES_KW  = ['awareness', 'bereik', 'reach', 'impressie'];
 const VERKEER_KW     = ['traffic', 'verkeer'];
 const LEADS_KW       = ['lead', 'formulier', 'form'];
 
+export function classifyObjective(name: string): Objective {
+  return classify(name);
+}
+
 function classify(name: string): Objective {
   const n = name.toLowerCase();
   if (VIDEO_KW.some((k) => n.includes(k)))       return 'video';

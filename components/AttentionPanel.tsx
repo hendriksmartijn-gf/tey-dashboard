@@ -3,13 +3,13 @@
 import { useMemo } from 'react';
 import type { CampaignRow, Platform } from '@/types/campaign';
 import type { Objective } from '@/types/objective';
+import { classifyObjective } from '@/types/objective';
 
 interface Props {
   /** Current period, campaign-filtered rows. */
   rows:     CampaignRow[];
   /** Previous period (same length), campaign-filtered rows — for deterioration signals. */
   prevRows: CampaignRow[];
-  objective: Objective;
   /** Optional worst funnel drop-off vacancy (from GA4). */
   vacancyDropoff?: { jobTitle: string; starts: number; completed: number } | null;
 }
@@ -26,7 +26,7 @@ const fmtEur2 = (n: number) => n.toLocaleString('nl-NL', { style: 'currency', cu
 const fmtNum  = (n: number) => n.toLocaleString('nl-NL');
 
 interface Sum {
-  name: string; platform: Platform;
+  name: string; platform: Platform; objective: Objective;
   spend: number; conv: number; clicks: number; impressions: number; thruplays: number;
 }
 
@@ -34,12 +34,34 @@ function aggregate(rows: CampaignRow[]): Map<string, Sum> {
   const m = new Map<string, Sum>();
   for (const r of rows) {
     const key = `${r.platform}::${r.campaign_name}`;
-    const cur = m.get(key) ?? { name: r.campaign_name, platform: r.platform, spend: 0, conv: 0, clicks: 0, impressions: 0, thruplays: 0 };
+    const cur = m.get(key) ?? {
+      name: r.campaign_name, platform: r.platform, objective: classifyObjective(r.campaign_name),
+      spend: 0, conv: 0, clicks: 0, impressions: 0, thruplays: 0,
+    };
     cur.spend += r.spend; cur.conv += r.conversions; cur.clicks += r.clicks;
     cur.impressions += r.impressions; cur.thruplays += r.thruplays ?? 0;
     m.set(key, cur);
   }
   return m;
+}
+
+// Per-campaign metric definition based on its own objective. Returns null when the metric
+// isn't computable OR the channel structurally doesn't report it (e.g. Google has no video data).
+function metricInfo(s: Sum) {
+  const isVideo = s.objective === 'video';
+  const isReach = s.objective === 'impressies' || s.objective === 'verkeer';
+  // Google Ads in this dataset has no video-view (thruplay) reporting — never judge it on video.
+  const videoUntracked = isVideo && s.platform === 'google';
+
+  const label  = isVideo ? 'CPCV' : isReach ? 'CPM' : s.objective === 'leads' ? 'CPL' : 'kosten/soll.';
+  const result = isVideo ? 'video views' : isReach ? 'clicks' : s.objective === 'leads' ? 'leads' : 'sollicitanten';
+  const volume = isVideo ? s.thruplays : isReach ? s.clicks : s.conv;
+  const metric: number | null =
+    videoUntracked || volume <= 0 ? null
+    : isReach ? (s.impressions > 0 ? s.spend / s.impressions * 1000 : null)
+    : s.spend / volume;
+
+  return { label, result, volume, metric, videoUntracked };
 }
 
 type Severity = 'high' | 'medium';
@@ -48,117 +70,102 @@ interface Issue {
   title: string; campaign: string; platform: Platform; detail: string;
 }
 
-export default function AttentionPanel({ rows, prevRows, objective, vacancyDropoff }: Props) {
+export default function AttentionPanel({ rows, prevRows, vacancyDropoff }: Props) {
   const issues = useMemo<Issue[]>(() => {
     const cur  = aggregate(rows);
     const prev = aggregate(prevRows);
+    const all  = [...cur.values()];
 
-    // Objective-specific metric definition (lower is better for all three).
-    const isVideo = objective === 'video';
-    const isReach = objective === 'impressies' || objective === 'verkeer';
-
-    const metricLabel = isVideo ? 'CPCV' : isReach ? 'CPM' : objective === 'leads' ? 'CPL' : 'kosten/soll.';
-    const resultLabel = isVideo ? 'video views' : isReach ? 'clicks' : objective === 'leads' ? 'leads' : 'sollicitanten';
-
-    const volume = (s: Sum) => isVideo ? s.thruplays : isReach ? s.clicks : s.conv;
-    const metric = (s: Sum): number | null => {
-      const v = volume(s);
-      if (v <= 0) return null;
-      if (isReach) return s.impressions > 0 ? s.spend / s.impressions * 1000 : null;
-      return s.spend / v;
-    };
-
-    const all        = [...cur.values()];
-    const totalSpend = all.reduce((a, s) => a + s.spend, 0);
-    const totalVol   = all.reduce((a, s) => a + volume(s), 0);
-    const avgMetric  = totalVol > 0 ? totalSpend / totalVol : null; // note: CPM avg handled below
-    const avgCpm     = (() => {
-      const imp = all.reduce((a, s) => a + s.impressions, 0);
-      return imp > 0 ? totalSpend / imp * 1000 : null;
-    })();
-    const accountAvg = isReach ? avgCpm : avgMetric;
-
+    const totalSpend     = all.reduce((a, s) => a + s.spend, 0);
     const spendThreshold = Math.max(50, totalSpend * 0.05);
-    const found = new Map<string, Issue>(); // dedupe by campaign key, keep first (highest priority)
 
+    // Account averages computed per objective group (so a CPM isn't compared against a CPA).
+    const avgByObjective = new Map<Objective, number | null>();
+    const groups = new Map<Objective, Sum[]>();
+    for (const s of all) {
+      const g = groups.get(s.objective) ?? [];
+      g.push(s); groups.set(s.objective, g);
+    }
+    for (const [obj, list] of groups) {
+      const isReach = obj === 'impressies' || obj === 'verkeer';
+      const spendSum = list.reduce((a, s) => a + s.spend, 0);
+      if (isReach) {
+        const imp = list.reduce((a, s) => a + s.impressions, 0);
+        avgByObjective.set(obj, imp > 0 ? spendSum / imp * 1000 : null);
+      } else {
+        const vol = list.reduce((a, s) => a + metricInfo(s).volume, 0);
+        avgByObjective.set(obj, vol > 0 ? spendSum / vol : null);
+      }
+    }
+
+    const found = new Map<string, Issue>();
     const add = (key: string, issue: Issue) => { if (!found.has(key)) found.set(key, issue); };
 
-    // 1. Budget zonder resultaat (highest priority)
+    // 1. Budget zonder resultaat (skip metrics a channel can't report)
     for (const [key, s] of cur) {
-      if (s.spend >= spendThreshold && volume(s) === 0) {
+      const info = metricInfo(s);
+      if (info.videoUntracked) continue; // can't judge Google on video views
+      if (s.spend >= spendThreshold && info.volume === 0) {
         add(key, {
           key, severity: 'high', icon: '🚨',
-          title: `Budget zonder ${resultLabel}`,
+          title: `Budget zonder ${info.result}`,
           campaign: s.name, platform: s.platform,
-          detail: `${fmtEur(s.spend)} uitgegeven, 0 ${resultLabel} in deze periode`,
+          detail: `${fmtEur(s.spend)} uitgegeven, 0 ${info.result} in deze periode`,
         });
       }
     }
 
     // 2. Verslechtering vs vorige periode
-    const deteriorations: { key: string; s: Sum; from: number; to: number; pct: number }[] = [];
+    const deteriorations: { key: string; s: Sum; from: number; to: number; pct: number; label: string }[] = [];
     for (const [key, s] of cur) {
       const p = prev.get(key);
       if (!p) continue;
-      const mNow = metric(s), mPrev = metric(p);
+      const mNow = metricInfo(s).metric, mPrev = metricInfo(p).metric;
       if (mNow === null || mPrev === null || mPrev === 0) continue;
       const pct = (mNow - mPrev) / mPrev;
-      if (pct >= 0.15) deteriorations.push({ key, s, from: mPrev, to: mNow, pct });
+      if (pct >= 0.15) deteriorations.push({ key, s, from: mPrev, to: mNow, pct, label: metricInfo(s).label });
     }
     deteriorations.sort((a, b) => b.pct - a.pct);
     for (const d of deteriorations) {
       add(d.key, {
         key: d.key, severity: d.pct >= 0.4 ? 'high' : 'medium', icon: '📈',
-        title: `${metricLabel} gestegen +${Math.round(d.pct * 100)}%`,
+        title: `${d.label} gestegen +${Math.round(d.pct * 100)}%`,
         campaign: d.s.name, platform: d.s.platform,
         detail: `${fmtEur2(d.from)} → ${fmtEur2(d.to)} t.o.v. vorige periode`,
       });
     }
 
-    // 3. Boven account-gemiddelde kosten
-    if (accountAvg !== null) {
-      const expensive = all
-        .map((s) => ({ s, m: metric(s) }))
-        .filter((x) => x.m !== null && x.m >= accountAvg * 1.5 && x.s.spend >= spendThreshold)
-        .sort((a, b) => b.m! - a.m!);
-      for (const x of expensive) {
-        const key = `${x.s.platform}::${x.s.name}`;
-        add(key, {
-          key, severity: 'medium', icon: '💸',
-          title: `${metricLabel} ${(x.m! / accountAvg).toFixed(1)}× boven gemiddelde`,
-          campaign: x.s.name, platform: x.s.platform,
-          detail: `${fmtEur2(x.m!)} vs. ${fmtEur2(accountAvg)} gemiddeld`,
-        });
-      }
+    // 3. Boven gemiddelde kosten (binnen dezelfde doelstelling)
+    const expensive = all
+      .map((s) => ({ s, info: metricInfo(s), avg: avgByObjective.get(s.objective) ?? null }))
+      .filter((x) => x.info.metric !== null && x.avg !== null && x.info.metric >= x.avg * 1.5 && x.s.spend >= spendThreshold)
+      .sort((a, b) => b.info.metric! - a.info.metric!);
+    for (const x of expensive) {
+      const key = `${x.s.platform}::${x.s.name}`;
+      add(key, {
+        key, severity: 'medium', icon: '💸',
+        title: `${x.info.label} ${(x.info.metric! / x.avg!).toFixed(1)}× boven gemiddelde`,
+        campaign: x.s.name, platform: x.s.platform,
+        detail: `${fmtEur2(x.info.metric!)} vs. ${fmtEur2(x.avg!)} gemiddeld`,
+      });
     }
 
-    const list = [...found.values()].sort((a, b) =>
-      (a.severity === b.severity ? 0 : a.severity === 'high' ? -1 : 1)
-    );
-    return list.slice(0, 6);
-  }, [rows, prevRows, objective]);
+    return [...found.values()]
+      .sort((a, b) => (a.severity === b.severity ? 0 : a.severity === 'high' ? -1 : 1))
+      .slice(0, 6);
+  }, [rows, prevRows]);
 
-  // Best performer (positive context)
+  // Best performer — strongest conversion campaign (primary recruitment goal).
   const best = useMemo(() => {
-    const isVideo = objective === 'video';
-    const isReach = objective === 'impressies' || objective === 'verkeer';
     const cur = aggregate(rows);
-    const volume = (s: Sum) => isVideo ? s.thruplays : isReach ? s.clicks : s.conv;
-    const metric = (s: Sum): number | null => {
-      const v = volume(s);
-      if (v <= 0) return null;
-      if (isReach) return s.impressions > 0 ? s.spend / s.impressions * 1000 : null;
-      return s.spend / v;
-    };
     const candidates = [...cur.values()]
-      .map((s) => ({ s, m: metric(s), v: volume(s) }))
-      .filter((x) => x.m !== null && x.v >= 2); // need a bit of volume to be meaningful
+      .filter((s) => (s.objective === 'conversies' || s.objective === 'leads') && s.conv >= 2)
+      .map((s) => ({ s, cpa: s.spend / s.conv }))
+      .sort((a, b) => a.cpa - b.cpa);
     if (candidates.length === 0) return null;
-    candidates.sort((a, b) => a.m! - b.m!);
     const w = candidates[0];
-    const label = isVideo ? 'CPCV' : isReach ? 'CPM' : objective === 'leads' ? 'CPL' : 'kosten/soll.';
-    return { name: w.s.name, platform: w.s.platform, m: w.m!, label };
-  }, [rows, objective]);
+    return { name: w.s.name, cpa: w.cpa, label: w.s.objective === 'leads' ? 'CPL' : 'kosten/soll.' };
+  }, [rows]);
 
   const dropoffRate = vacancyDropoff && vacancyDropoff.starts > 0
     ? 1 - vacancyDropoff.completed / vacancyDropoff.starts
@@ -226,7 +233,7 @@ export default function AttentionPanel({ rows, prevRows, objective, vacancyDropo
             <span className="text-base leading-none">🏆</span>
             <p className="text-xs" style={{ color: '#555E6C' }}>
               Sterkste deze periode: <span className="font-semibold" style={{ color: '#12101F' }}>{best.name}</span>
-              {' '}— {best.label} {fmtEur2(best.m)}
+              {' '}— {best.label} {fmtEur2(best.cpa)}
             </p>
           </div>
         )}

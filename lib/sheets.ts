@@ -6,7 +6,23 @@ import type { CampaignRow, Platform } from '@/types/campaign';
 
 function toNum(v: unknown): number {
   if (v === null || v === undefined || v === '') return 0;
-  const n = Number(String(v).replace(/,/g, '.').replace(/[^0-9.\-]/g, ''));
+  // Strip everything except digits, separators and minus (removes €, spaces, etc.)
+  let s = String(v).trim().replace(/[^0-9.,-]/g, '');
+  if (s === '' || s === '-') return 0;
+
+  const hasComma = s.includes(',');
+  const hasDot   = s.includes('.');
+  if (hasComma && hasDot) {
+    // The right-most separator is the decimal one.
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      s = s.replace(/\./g, '').replace(',', '.'); // EU: 1.234,56 → 1234.56
+    } else {
+      s = s.replace(/,/g, '');                    // US: 1,234.56 → 1234.56
+    }
+  } else if (hasComma) {
+    s = s.replace(',', '.');                       // 1234,56 → 1234.56
+  }
+  const n = Number(s);
   return isNaN(n) ? 0 : n;
 }
 
@@ -27,10 +43,21 @@ function normaliseDate(v: unknown): string {
   return s;
 }
 
-/** Find a column index by trying several candidate header names (case-insensitive). */
+/**
+ * Find a column index by trying several candidate header names.
+ * First pass = exact (case-insensitive) match. Second pass = fuzzy: a header that contains
+ * a candidate (or vice-versa). The fuzzy pass catches export-naming drift like
+ * "Cost: Amount spent in local currency" vs the expected "...amount spend...".
+ */
 function findCol(headers: string[], ...candidates: string[]): number {
+  const norm = headers.map((h) => h.toLowerCase().trim());
   for (const c of candidates) {
-    const idx = headers.findIndex((h) => h.toLowerCase().trim() === c.toLowerCase());
+    const idx = norm.indexOf(c.toLowerCase());
+    if (idx !== -1) return idx;
+  }
+  for (const c of candidates) {
+    const cl = c.toLowerCase();
+    const idx = norm.findIndex((h) => h.includes(cl) || cl.includes(h));
     if (idx !== -1) return idx;
   }
   return -1;
@@ -108,7 +135,7 @@ function normaliseLinkedIn(rows: string[][]): CampaignRow[] {
   const iDate       = findCol(headers, 'report: date', 'date', 'day', 'start date', 'startdate');
   const iImpr       = findCol(headers, 'performance: impressions', 'impressions', 'impressie', 'views');
   const iClicks     = findCol(headers, 'performance: clicks', 'clicks', 'klikken', 'total clicks');
-  const iSpend      = findCol(headers, 'cost: amount spend in local currency', 'cost: amount spend', 'amount spent', 'spend', 'cost (local currency)');
+  const iSpend      = findCol(headers, 'cost: amount spend in local currency', 'cost: amount spent in local currency', 'amount spent', 'amount spend', 'spent', 'spend', 'cost (local currency)');
   const iConv       = findCol(headers, 'performance: conversions', 'conversions', 'leads', 'total conversions');
   const iReach      = findCol(headers, 'performance: reach', 'reach', 'bereik');
   const iThruplays  = findCol(headers, 'video: plays at 100%', 'video: plays at 100', 'thruplays', 'thruplay');
@@ -143,7 +170,7 @@ function normaliseMeta(rows: string[][]): CampaignRow[] {
   const iDate       = findCol(headers, 'report: date', 'date', 'day', 'reporting starts', 'reporting start');
   const iImpr       = findCol(headers, 'performance: impressions', 'impressions', 'impressie', 'views');
   const iClicks     = findCol(headers, 'performance: clicks', 'clicks', 'link clicks', 'outbound clicks');
-  const iSpend      = findCol(headers, 'cost: amount spend', 'amount spent (eur)', 'amount spent', 'spend', 'cost');
+  const iSpend      = findCol(headers, 'cost: amount spend', 'amount spent (eur)', 'amount spent', 'amount spend', 'spent', 'spend');
   const iConv       = findCol(headers, 'conversions: leads - total', 'conversions', 'results', 'leads', 'purchases');
   const iReach      = findCol(headers, 'performance: reach', 'reach', 'bereik');
   const iThruplays  = findCol(headers, 'video thruplay', 'thruplays', 'thruplay', 'video: plays at 100%');

@@ -967,7 +967,6 @@ export default function DashboardPage() {
                   <AttentionPanel
                     rows={filteredRows}
                     prevRows={attentionPrevRows}
-                    objective={effectiveObjective}
                     vacancyDropoff={worstDropoff}
                   />
                 )}
