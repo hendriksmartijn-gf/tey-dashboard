@@ -127,7 +127,8 @@ export default function PacingTable({ allRows, filteredRows, dateTo }: Props) {
       const startMs   = new Date(all.minDate + 'T00:00:00').getTime();
       const endMs     = new Date(all.maxDate + 'T00:00:00').getTime();
       const totalDays = (endMs - startMs) / 86_400_000;
-      const elapsed   = Math.max(0, (todayMs - startMs) / 86_400_000);
+      // Clamp elapsed to the campaign's known data range — "today" may be beyond last data point.
+      const elapsed   = Math.max(0, Math.min(todayMs - startMs, endMs - startMs) / 86_400_000);
 
       // Runtime pacing: how far through the campaign's lifetime are we (based on selected end date)
       const runtimePct = totalDays > 0 ? Math.min(elapsed / totalDays, 1) : 1;
