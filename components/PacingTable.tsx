@@ -82,11 +82,17 @@ export function PacingTableSkeleton() {
 // ── main component ────────────────────────────────────────────────────────────
 
 export default function PacingTable({ allRows, filteredRows, dateTo }: Props) {
+  // Social only — Google Ads has daily budgets without a fixed campaign lifetime, so pacing doesn't apply.
+  const socialFiltered = filteredRows.filter((r) => r.platform !== 'google');
+  const socialAll      = allRows.filter((r) => r.platform !== 'google');
+
   // 1) Period spend per campaign (from date-filtered + campaign-filtered rows)
   const periodSpendMap = new Map<string, number>();
-  for (const r of filteredRows) {
+  const periodImprMap  = new Map<string, number>();
+  for (const r of socialFiltered) {
     const key = `${r.platform}::${r.campaign_name}`;
     periodSpendMap.set(key, (periodSpendMap.get(key) ?? 0) + r.spend);
+    periodImprMap.set(key,  (periodImprMap.get(key)  ?? 0) + r.impressions);
   }
 
   // 2) All-time data per campaign (min/max date, total spend)
@@ -96,7 +102,7 @@ export default function PacingTable({ allRows, filteredRows, dateTo }: Props) {
     maxDate:    string;
     totalSpend: number;
   }>();
-  for (const r of allRows) {
+  for (const r of socialAll) {
     const key = `${r.platform}::${r.campaign_name}`;
     const cur = allMap.get(key);
     if (!cur) {
@@ -126,6 +132,10 @@ export default function PacingTable({ allRows, filteredRows, dateTo }: Props) {
       // Runtime pacing: how far through the campaign's lifetime are we (based on selected end date)
       const runtimePct = totalDays > 0 ? Math.min(elapsed / totalDays, 1) : 1;
 
+      // Spend missing: campaign had impressions but €0 spend (data not exported from source)
+      const periodImpr    = periodImprMap.get(key) ?? 0;
+      const spendMissing  = all.totalSpend === 0 && periodImpr > 0;
+
       // Budget pacing: spend in current period vs. all-time spend for this campaign
       const budgetPct = all.totalSpend > 0 ? Math.min(periodSpend / all.totalSpend, 1) : 0;
 
@@ -139,6 +149,7 @@ export default function PacingTable({ allRows, filteredRows, dateTo }: Props) {
         totalSpend:  all.totalSpend,
         runtimePct,
         budgetPct,
+        spendMissing,
         totalDays:   Math.round(totalDays),
         elapsedDays: Math.round(elapsed),
       };
@@ -162,8 +173,9 @@ export default function PacingTable({ allRows, filteredRows, dateTo }: Props) {
       className="bg-white overflow-hidden"
       style={{ border: '1px solid #DCE0E6', borderRadius: '8px', boxShadow: '0 8px 24px rgba(18,16,34,0.08)' }}
     >
-      <div className="px-5 py-4" style={{ borderBottom: '1px solid #DCE0E6' }}>
+      <div className="px-5 py-4 flex items-baseline gap-3 flex-wrap" style={{ borderBottom: '1px solid #DCE0E6' }}>
         <span className="gf-eyebrow">Campagne pacing</span>
+        <span className="text-xs" style={{ color: '#BCC4CF' }}>LinkedIn &amp; Meta — Google Ads heeft geen vaste looptijd</span>
       </div>
 
       <div className="overflow-x-auto">
@@ -196,8 +208,8 @@ export default function PacingTable({ allRows, filteredRows, dateTo }: Props) {
 
               // Budget pacing colour: green ≈ on-track, amber = underspending, red = overspending
               const ratio = c.runtimePct > 0 ? c.budgetPct / c.runtimePct : 0;
-              const budgetColor =
-                ratio >= 0.85 && ratio <= 1.15 ? '#16A34A'
+              const budgetColor = c.spendMissing ? '#F59E0B'
+                : ratio >= 0.85 && ratio <= 1.15 ? '#16A34A'
                 : ratio < 0.85               ? '#F59E0B'
                 :                              '#DC2626';
 
@@ -250,10 +262,16 @@ export default function PacingTable({ allRows, filteredRows, dateTo }: Props) {
 
                   {/* Budget pacing */}
                   <td className="px-5 py-3.5" style={{ minWidth: '180px' }}>
-                    <PacingBar pct={c.budgetPct} color={budgetColor} />
-                    <p className="text-xs mt-1" style={{ color: '#BCC4CF' }}>
-                      {fmtEur(c.periodSpend)} / {fmtEur(c.totalSpend)} totaal
-                    </p>
+                    {c.spendMissing ? (
+                      <p className="text-xs font-semibold" style={{ color: '#F59E0B' }}>spend ontbreekt in bron</p>
+                    ) : (
+                      <>
+                        <PacingBar pct={c.budgetPct} color={budgetColor} />
+                        <p className="text-xs mt-1" style={{ color: '#BCC4CF' }}>
+                          {fmtEur(c.periodSpend)} / {fmtEur(c.totalSpend)} totaal
+                        </p>
+                      </>
+                    )}
                   </td>
                 </tr>
               );

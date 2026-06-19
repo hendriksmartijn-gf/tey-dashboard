@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import KpiCard, { KpiCardSkeleton } from '@/components/KpiCard';
 import ChannelCard, { ChannelCardSkeleton } from '@/components/ChannelCard';
 import CampaignRankTable, { CampaignRankTableSkeleton } from '@/components/CampaignRankTable';
-import CpaTrendChart, { CpaTrendChartSkeleton } from '@/components/CpaTrendChart';
 import PacingTable, { PacingTableSkeleton } from '@/components/PacingTable';
 import DailyDeliveryChart, { DailyDeliveryChartSkeleton } from '@/components/DailyDeliveryChart';
 import RealCpaSection from '@/components/RealCpaSection';
@@ -751,7 +750,6 @@ export default function DashboardPage() {
                 ['overzicht',    'Overzicht'],
                 ['echte-kosten', 'Echte kosten'],
                 ['kanalen',      'Kanalen'],
-                ['trend',        'Trend'],
                 ['aandacht',     'Aandacht'],
                 ['campagnes',    'Campagnes'],
                 ['uitlevering',  'Uitlevering'],
@@ -990,14 +988,6 @@ export default function DashboardPage() {
                 )}
               </section>
 
-              {/* Trend line – metric auto-adapts to objective, platforms toggleable */}
-              <section id="trend" className="scroll-mt-[150px]">
-                <h2 className="gf-eyebrow mb-5">Trendlijn per dag</h2>
-                {loading
-                  ? <CpaTrendChartSkeleton />
-                  : <CpaTrendChart rows={filteredRows} objective={effectiveObjective} />
-                }
-              </section>
 
               {/* Wat vraagt aandacht – problemen & bijstuur-signalen */}
               <section id="aandacht" className="scroll-mt-[150px]">
@@ -1027,10 +1017,7 @@ export default function DashboardPage() {
                 <h2 className="gf-eyebrow mb-5">Dagelijkse uitlevering per campagne</h2>
                 {loading
                   ? <DailyDeliveryChartSkeleton />
-                  : <DailyDeliveryChart
-                      allRows={rows.filter((r) => selectedCampaigns.size === 0 || selectedCampaigns.has(r.campaign_name))}
-                      filteredRows={filteredRows}
-                    />
+                  : <DailyDeliveryChart filteredRows={filteredRows} />
                 }
               </section>
 

@@ -8,13 +8,10 @@ import {
 import type { CampaignRow, Platform } from '@/types/campaign';
 
 interface Props {
-  /** All rows for the campaigns currently selected in the sidebar, unfiltered by date — used to derive pacing reference. */
-  allRows: CampaignRow[];
-  /** Date-filtered rows for the same selection — used for the actual delivery lines. */
   filteredRows: CampaignRow[];
 }
 
-type Metric = 'spend' | 'impressions';
+type Metric = 'spend' | 'impressions' | 'clicks' | 'conversions';
 
 const PLATFORM_COLOR: Record<Platform, string> = {
   linkedin: '#0077B5',
@@ -40,7 +37,7 @@ export function DailyDeliveryChartSkeleton() {
   );
 }
 
-export default function DailyDeliveryChart({ allRows, filteredRows }: Props) {
+export default function DailyDeliveryChart({ filteredRows }: Props) {
   const [metric, setMetric] = useState<Metric>('spend');
 
   // Campaigns available = unique names in current selection (sidebar filter).
@@ -66,49 +63,23 @@ export default function DailyDeliveryChart({ allRows, filteredRows }: Props) {
     });
   }, [campaigns]);
 
-  // For each picked campaign: collect all-time min/max date and all-time total, for pacing reference.
-  const meta = useMemo(() => {
-    const m = new Map<string, { platform: Platform; minDate: string; maxDate: string; allSpend: number; allImpr: number }>();
-    for (const r of allRows) {
-      if (!picked.has(r.campaign_name)) continue;
-      const cur = m.get(r.campaign_name);
-      if (!cur) {
-        m.set(r.campaign_name, { platform: r.platform, minDate: r.date, maxDate: r.date, allSpend: r.spend, allImpr: r.impressions });
-      } else {
-        if (r.date < cur.minDate) cur.minDate = r.date;
-        if (r.date > cur.maxDate) cur.maxDate = r.date;
-        cur.allSpend += r.spend;
-        cur.allImpr  += r.impressions;
-      }
-    }
-    return m;
-  }, [allRows, picked]);
-
-  // Build chart data: one row per day with per-campaign actual + per-campaign pacing reference.
+  // Build chart data: one row per day with per-campaign actual values.
   const data = useMemo(() => {
     if (picked.size === 0) return [];
     const days = new Set<string>();
     for (const r of filteredRows) if (picked.has(r.campaign_name)) days.add(dayKey(r.date));
     const sorted = Array.from(days).sort();
 
-    // Pacing reference per campaign = totalAll / runtimeDays (constant horizontal line, only drawn within runtime).
-    const pacing = new Map<string, number | null>();
-    for (const [name, info] of meta.entries()) {
-      const start = new Date(info.minDate + 'T00:00:00').getTime();
-      const end   = new Date(info.maxDate + 'T00:00:00').getTime();
-      const days  = Math.max(1, (end - start) / 86_400_000 + 1);
-      const total = metric === 'spend' ? info.allSpend : info.allImpr;
-      pacing.set(name, total > 0 ? total / days : null);
-    }
-
-    // Aggregate filtered rows by day × campaign.
     const dayMap = new Map<string, Map<string, number>>();
     for (const r of filteredRows) {
       if (!picked.has(r.campaign_name)) continue;
       const k = dayKey(r.date);
       if (!dayMap.has(k)) dayMap.set(k, new Map());
       const inner = dayMap.get(k)!;
-      const v = metric === 'spend' ? r.spend : r.impressions;
+      const v = metric === 'spend' ? r.spend
+              : metric === 'impressions' ? r.impressions
+              : metric === 'clicks'      ? r.clicks
+              :                            r.conversions;
       inner.set(r.campaign_name, (inner.get(r.campaign_name) ?? 0) + v);
     }
 
@@ -117,17 +88,10 @@ export default function DailyDeliveryChart({ allRows, filteredRows }: Props) {
       const inner = dayMap.get(d);
       for (const name of picked) {
         point[`v_${name}`] = inner?.get(name) ?? 0;
-        const dayMs = new Date(d + 'T00:00:00').getTime();
-        const info = meta.get(name);
-        const inRuntime = info
-          ? dayMs >= new Date(info.minDate + 'T00:00:00').getTime() &&
-            dayMs <= new Date(info.maxDate + 'T00:00:00').getTime()
-          : false;
-        point[`p_${name}`] = inRuntime ? pacing.get(name) ?? null : null;
       }
       return point;
     });
-  }, [filteredRows, picked, meta, metric]);
+  }, [filteredRows, picked, metric]);
 
   const colorFor = (name: string) => {
     const idx = [...picked].indexOf(name);
@@ -135,7 +99,10 @@ export default function DailyDeliveryChart({ allRows, filteredRows }: Props) {
   };
 
   const fmt = metric === 'spend' ? fmtEur : fmtNum;
-  const metricLabel = metric === 'spend' ? 'Spend' : 'Impressies';
+  const metricLabel = metric === 'spend' ? 'Spend'
+                    : metric === 'impressions' ? 'Impressies'
+                    : metric === 'clicks' ? 'Klikken'
+                    : 'Conversies';
 
   function CustomTooltip({ active, payload, label }: {
     active?: boolean;
@@ -143,9 +110,7 @@ export default function DailyDeliveryChart({ allRows, filteredRows }: Props) {
     label?: string;
   }) {
     if (!active || !payload?.length) return null;
-    // Group actual vs pacing
     const actuals = payload.filter((p) => p.dataKey.startsWith('v_'));
-    const pacings = payload.filter((p) => p.dataKey.startsWith('p_'));
     return (
       <div className="bg-white border rounded-lg shadow-lg p-3 text-xs space-y-1.5 min-w-[220px]" style={{ borderColor: '#DCE0E6' }}>
         <p className="font-semibold mb-1" style={{ color: '#12101F' }}>
@@ -153,8 +118,6 @@ export default function DailyDeliveryChart({ allRows, filteredRows }: Props) {
         </p>
         {actuals.map((p) => {
           const name = p.dataKey.slice(2);
-          const pace = pacings.find((q) => q.dataKey === `p_${name}`);
-          const diff = pace && pace.value > 0 ? (p.value - pace.value) / pace.value : null;
           return (
             <div key={p.dataKey} className="flex items-center justify-between gap-3">
               <span className="flex items-center gap-1.5 truncate" style={{ color: p.color, maxWidth: '160px' }}>
@@ -163,20 +126,10 @@ export default function DailyDeliveryChart({ allRows, filteredRows }: Props) {
               </span>
               <span className="tabular-nums font-semibold whitespace-nowrap" style={{ color: '#12101F' }}>
                 {fmt(p.value)}
-                {diff !== null && (
-                  <span className="ml-1.5 text-[10px] font-normal" style={{ color: diff >= 0 ? '#16A34A' : '#DC2626' }}>
-                    {diff >= 0 ? '+' : ''}{Math.round(diff * 100)}%
-                  </span>
-                )}
               </span>
             </div>
           );
         })}
-        {pacings.some((p) => p.value > 0) && (
-          <p className="text-[10px] pt-1" style={{ color: '#8C9BAF', borderTop: '1px solid #F0F4F8' }}>
-            % = afwijking t.o.v. verwacht dagtempo
-          </p>
-        )}
       </div>
     );
   }
@@ -188,7 +141,7 @@ export default function DailyDeliveryChart({ allRows, filteredRows }: Props) {
         <div>
           <span className="gf-eyebrow block mb-1.5">Metric</span>
           <div className="flex gap-1.5">
-            {(['spend', 'impressions'] as Metric[]).map((m) => {
+            {(['spend', 'impressions', 'clicks', 'conversions'] as Metric[]).map((m) => {
               const active = metric === m;
               return (
                 <button
@@ -202,7 +155,7 @@ export default function DailyDeliveryChart({ allRows, filteredRows }: Props) {
                     border:     `1px solid ${active ? '#6331F4' : '#DCE0E6'}`,
                   }}
                 >
-                  {m === 'spend' ? 'Spend' : 'Impressies'}
+                  {m === 'spend' ? 'Spend' : m === 'impressions' ? 'Impressies' : m === 'clicks' ? 'Klikken' : 'Conversies'}
                 </button>
               );
             })}
@@ -291,14 +244,7 @@ export default function DailyDeliveryChart({ allRows, filteredRows }: Props) {
               width={72}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend
-              wrapperStyle={{ fontSize: '11px' }}
-              formatter={(value: string) => {
-                // Hide pacing lines from the legend to reduce noise.
-                if (value.startsWith('⏵ ')) return value.slice(2);
-                return value;
-              }}
-            />
+            <Legend wrapperStyle={{ fontSize: '11px' }} />
 
             {[...picked].map((name) => {
               const c = colorFor(name);
@@ -315,32 +261,10 @@ export default function DailyDeliveryChart({ allRows, filteredRows }: Props) {
                 />
               );
             })}
-            {[...picked].map((name) => {
-              const c = colorFor(name);
-              return (
-                <Line
-                  key={`p_${name}`}
-                  type="monotone"
-                  dataKey={`p_${name}`}
-                  name={`⏵ ${name} (tempo)`}
-                  stroke={c}
-                  strokeWidth={1}
-                  strokeDasharray="4 4"
-                  dot={false}
-                  activeDot={false}
-                  legendType="none"
-                  connectNulls
-                />
-              );
-            })}
           </LineChart>
         </ResponsiveContainer>
       )}
 
-      <p className="text-xs mt-3" style={{ color: '#8C9BAF' }}>
-        Onderbroken lijn = verwacht dagtempo per campagne ({metricLabel.toLowerCase()} totaal ÷ looptijd).
-        Boven de lijn = sneller dan gepland, onder de lijn = achterstand.
-      </p>
     </div>
   );
 }
