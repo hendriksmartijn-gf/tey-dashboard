@@ -25,6 +25,9 @@ type PlatformKey = keyof typeof PLATFORM_CFG;
 const fmtEur = (v: number) =>
   v.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 
+const fmtEurDecimal = (v: number) =>
+  v.toLocaleString('nl-NL', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 function getObjectiveConfig(objective: Objective | undefined) {
@@ -32,8 +35,8 @@ function getObjectiveConfig(objective: Objective | undefined) {
     case 'video':
       return {
         title:      'CPCV trend (kosten per video view)',
-        yFormat:    fmtEur,
-        ttFormat:   fmtEur,
+        yFormat:    fmtEurDecimal,
+        ttFormat:   fmtEurDecimal,
         compute:    (spend: number, _conv: number, impressions: number, thruplays: number) =>
                       thruplays > 0 ? spend / thruplays : null,
       };
@@ -198,7 +201,8 @@ export default function CpaTrendChart({ rows, objective }: Props) {
           <YAxis
             tick={{ fontSize: 11 }}
             tickFormatter={cfg.yFormat}
-            width={72}
+            width={80}
+            domain={['auto', 'auto']}
           />
           <Tooltip content={<CustomTooltip ttFormat={cfg.ttFormat} />} />
           {(Object.keys(PLATFORM_CFG) as PlatformKey[]).map((key) => (
